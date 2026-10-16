@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+docs_private/
+
+# Valódi exportok, riportok és helyi alkalmazásállapot
+*.csv
+*.xlsx
+*.xlsm
+*.db
+*.sqlite3
+.env
