@@ -1,4 +1,4 @@
-"""Az éves riport hierarchikus ellenőrzése; forráshibát nem fedünk el."""
+"""Test workbook validation."""
 
 from datetime import date
 from unittest.mock import Mock
@@ -7,13 +7,13 @@ import pytest
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.styles import Font
-from axelpro_riport import excel_files as f
-from axelpro_riport.excel_constants import MONTH_NAMES
+from sales_report import excel_files as f
+from sales_report.excel_constants import MONTH_NAMES
 
 
 @pytest.fixture
 def report_path(tmp_path, year_report_bytes):
-    path = tmp_path / "Napi_értékesítési_riport_2026.xlsx"
+    path = tmp_path / "Sales_Report_2026.xlsx"
     path.write_bytes(year_report_bytes)
     return path
 
@@ -23,26 +23,26 @@ def test_valid_report_loads_with_imported_and_manual_values(
     report_path
 ):
     wb = load_workbook(report_path)
-    wb["Január"]["J8"] = 120
-    wb["Január"]["B74"] = 20.5
+    wb["January"]["J8"] = 120
+    wb["January"]["B74"] = 20.5
     wb.save(report_path)
     loaded, path = f.load_year_workbook(
         report_path.parent, 2026, set(range(1, 13)), None
     )
     assert path == report_path
-    assert loaded["Január"]["J8"].value == 120
-    assert loaded["Január"]["B74"].value == 20.5
+    assert loaded["January"]["J8"].value == 120
+    assert loaded["January"]["B74"].value == 20.5
     loaded.close()
 
 
 def test_missing_sheet_is_reported_before_headers(report_path):
     wb = load_workbook(report_path)
-    del wb["Február"]
-    wb["Január"]["B2"] = "also bad"
+    del wb["February"]
+    wb["January"]["B2"] = "also bad"
     wb.save(report_path)
     with pytest.raises(f.WorkbookValidationError) as error:
         f.load_year_workbook(report_path.parent, 2026, set(range(1, 13)), None)
-    assert "Február" in str(error.value) and "Hiányzó" in str(error.value)
+    assert "February" in str(error.value) and "Missing" in str(error.value)
 
 
 @pytest.mark.parametrize(
@@ -57,7 +57,7 @@ def test_missing_sheet_is_reported_before_headers(report_path):
 )
 def test_month_headers_report_exact_location(report_path, cell, value):
     wb = load_workbook(report_path)
-    sheet = wb["Január"]
+    sheet = wb["January"]
     if isinstance(sheet[cell], MergedCell):
         for merged_range in list(sheet.merged_cells.ranges):
             if cell in merged_range:
@@ -67,18 +67,18 @@ def test_month_headers_report_exact_location(report_path, cell, value):
     wb.save(report_path)
     with pytest.raises(f.WorkbookValidationError) as error:
         f.load_year_workbook(report_path.parent, 2026, set(range(1, 13)), None)
-    assert "Január" in str(error.value) and cell in str(error.value)
+    assert "January" in str(error.value) and cell in str(error.value)
     assert str(report_path) in str(error.value)
 
 
 @pytest.mark.parametrize(
     "sheet,cell",
     [
-        ("Összesítő", "A1"),
-        ("Összesítő", "M2"),
-        ("Euro", "A13"),
-        ("_napi_árfolyamok", "B1"),
-        ("_importált_bizonylatok", "A1"),
+        ("Summary", "A1"),
+        ("Summary", "M2"),
+        ("Exchange_Rates", "A13"),
+        ("_daily_exchange_rates", "B1"),
+        ("_imported_documents", "A1"),
     ],
 )
 def test_other_sheet_headers_report_exact_location(report_path, sheet, cell):
@@ -91,10 +91,10 @@ def test_other_sheet_headers_report_exact_location(report_path, sheet, cell):
 
 
 @pytest.mark.parametrize(
-    "action,expected", [("remove", "Hiányzó"), ("add", "Nem megfelelő")]
+    "action,expected", [("remove", "Missing"), ("add", "Unexpected")]
 )
 def test_merge_errors(year_report, reference_report, tmp_path, action, expected):
-    sheet = year_report["Január"]
+    sheet = year_report["January"]
     if action == "remove":
         sheet.unmerge_cells("B8:C8")
     else:
@@ -107,12 +107,12 @@ def test_merge_errors(year_report, reference_report, tmp_path, action, expected)
 
 @pytest.mark.parametrize(
     "cell,value,description",
-    [("A8", "wrong", "felirat"), ("J12", "=1+2", "képlet"), ("J12", 123, "képlet")],
+    [("A8", "wrong", "label"), ("J12", "=1+2", "formula"), ("J12", 123, "formula")],
 )
 def test_fixed_label_and_formula_validation(
     year_report, reference_report, tmp_path, cell, value, description
 ):
-    year_report["Január"][cell] = value
+    year_report["January"][cell] = value
     with pytest.raises(f.WorkbookValidationError) as error:
         f._validate_labels_and_formulas(
             year_report, reference_report, tmp_path / "report.xlsx", list(MONTH_NAMES)
@@ -130,7 +130,7 @@ def test_unchanged_labels_and_formulas_are_valid(
 
 @pytest.mark.parametrize("cell", ["B7", "A49", "B42"])
 def test_reserved_empty_cells(year_report, reference_report, tmp_path, cell):
-    year_report["Január"][cell] = "unexpected"
+    year_report["January"][cell] = "unexpected"
     with pytest.raises(f.WorkbookValidationError) as error:
         f._validate_empty_cells(year_report, reference_report, tmp_path / "report.xlsx", list(MONTH_NAMES))
     assert cell in str(error.value)
@@ -142,7 +142,7 @@ def test_reserved_empty_cells(year_report, reference_report, tmp_path, cell):
 def test_data_cells_reject_non_numeric_values(
     year_report, reference_report, tmp_path, value
 ):
-    year_report["Január"]["J8"] = value
+    year_report["January"]["J8"] = value
     with pytest.raises(f.WorkbookValidationError, match="J8"):
         f._validate_numeric_cells(
             year_report, reference_report, tmp_path / "report.xlsx", list(MONTH_NAMES)
@@ -153,18 +153,18 @@ def test_data_cells_reject_non_numeric_values(
 def test_data_cells_accept_empty_and_finite_numbers(
     year_report, reference_report, tmp_path, value
 ):
-    year_report["Január"]["J8"] = value
+    year_report["January"]["J8"] = value
     f._validate_numeric_cells(year_report, reference_report, tmp_path / "report.xlsx", list(MONTH_NAMES))
 
 
 @pytest.mark.parametrize(
     "kind,description",
-    [("row", "sormagasság"), ("column", "oszlopszélesség"), ("font", "betűformázás")],
+    [("row", "row height"), ("column", "column width"), ("font", "font")],
 )
 def test_formatting_differences_warn_without_interrupting(
     year_report, reference_report, tmp_path, kind, description
 ):
-    sheet = year_report["Január"]
+    sheet = year_report["January"]
     if kind == "row":
         sheet.row_dimensions[8].height = 99
     elif kind == "column":
@@ -182,7 +182,7 @@ def test_formatting_differences_warn_without_interrupting(
 def test_failed_validation_closes_loaded_workbook(report_path, monkeypatch):
     wb = load_workbook(report_path)
     wb.close = Mock(wraps=wb.close)
-    del wb["Január"]
+    del wb["January"]
     monkeypatch.setattr(f, "load_workbook", lambda *args, **kwargs: wb)
     with pytest.raises(f.WorkbookValidationError):
         f.load_year_workbook(report_path.parent, 2026, set(range(1, 13)), None)

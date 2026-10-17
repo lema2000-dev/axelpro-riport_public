@@ -1,4 +1,4 @@
-"""Cellák, formázások, méretek és összevonások másolása."""
+"""Copy cells, formulas, dimensions and merged ranges between worksheets."""
 
 from copy import copy
 from openpyxl.formula.translate import Translator
@@ -17,7 +17,7 @@ def _copy_cell(
     clear_values: bool = False,
     clear_formulas: bool = False
 ) -> None:
-    """Egy cella értékének, képletének és formázásának másolása."""
+    """Copy cell."""
     source = source_sheet.cell(row=source_row, column=source_column)
     target = target_sheet.cell(row=target_row, column=target_column)
     if source.data_type == "f":
@@ -50,7 +50,7 @@ def _copy_range(
     clear_values: bool = False,
     clear_formulas: bool = False
 ) -> None:
-    """Egy téglalap alakú cellatartomány másolása."""
+    """Copy range."""
     for source_row in range(min_row, max_row + 1):
         for source_column in range(min_column, max_column + 1):
             target_row = target_start_row + (source_row - min_row)
@@ -74,7 +74,7 @@ def _copy_row_heights(
     max_row: int,
     target_start_row: int,
 ) -> None:
-    """A másolt sorok magasságának átvitele."""
+    """Copy row heights."""
     for source_row in range(min_row, max_row + 1):
         target_row = target_start_row + (source_row - min_row)
         target_sheet.row_dimensions[target_row].height = source_sheet.row_dimensions[
@@ -89,7 +89,7 @@ def _copy_column_widths(
     max_column: int,
     target_start_column: int,
 ) -> None:
-    """A másolt oszlopok szélességének átvitele."""
+    """Copy column widths."""
     for source_column in range(min_column, max_column + 1):
         target_column = target_start_column + (source_column - min_column)
         source_letter = get_column_letter(source_column)
@@ -109,7 +109,7 @@ def _copy_merged_ranges(
     target_start_row: int,
     target_start_column: int,
 ) -> None:
-    """A másolt tartományon belüli cellaösszevonások átvitele."""
+    """Copy merged ranges."""
     row_offset = target_start_row - min_row
     column_offset = target_start_column - min_column
     for merged_range in list(source_sheet.merged_cells.ranges):
@@ -140,7 +140,7 @@ def copy_block(
     clear_values: bool = False,
     clear_formulas: bool = False
 ) -> None:
-    """Cellák, méretek és összevonások együttes másolása."""
+    """Copy block."""
     _copy_range(
         source_sheet=source_sheet,
         target_sheet=target_sheet,

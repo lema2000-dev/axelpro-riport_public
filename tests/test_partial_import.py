@@ -1,32 +1,32 @@
-"""A már mentett évek megőrzése és az erőforrások lezárása."""
+"""Test partial import."""
 
 from datetime import date
 from decimal import Decimal
 from unittest.mock import Mock
 import pytest
 from openpyxl import Workbook, load_workbook
-from axelpro_riport import import_service as service, settings
-from axelpro_riport.excel_files import (
+from sales_report import import_service as service, settings
+from sales_report.excel_files import (
     WorkbookSaveError,
     WorkbookFileAccessError,
     WorkbookValidationError,
 )
-from axelpro_riport.excel_constants import (
+from sales_report.excel_constants import (
     PROCESSED_DOCUMENTS_SHEET,
     DAILY_EXCHANGE_RATES_SHEET,
 )
-from axelpro_riport.models import DailyExchangeRate
+from sales_report.models import DailyExchangeRate
 
 
 def small_report(year):
     wb = Workbook()
-    wb.active.title = "Január"
+    wb.active.title = "January"
     wb.active["B2"] = date(year, 1, 5)
-    wb.create_sheet(PROCESSED_DOCUMENTS_SHEET).append(["Év", "Bizonylatszám"])
+    wb.create_sheet(PROCESSED_DOCUMENTS_SHEET).append(["Year", "Document number"])
     wb.create_sheet(DAILY_EXCHANGE_RATES_SHEET).append(
         ["Application", "Source", "Rate"]
     )
-    wb.create_sheet("Euro")
+    wb.create_sheet("Exchange_Rates")
     wb.close = Mock(wraps=wb.close)
     return wb
 
@@ -46,12 +46,12 @@ def test_later_failure_reports_saved_year_and_closes_workbooks(
         "get_exchange_rates",
         lambda **kwargs: {today: DailyExchangeRate(today, today, Decimal(400))},
     )
-    # Ez a teszt az éves írási szakaszt izolálja; a bizonylatolvasónak külön tesztje van.
+    # Isolate annual writing; document reading is tested separately.
     monkeypatch.setattr(
         service, "_read_processed_documents", lambda **kwargs: set()
     )
     template = Workbook()
-    template.active.title = "Szeptember"
+    template.active.title = "September"
     template.close = Mock(wraps=template.close)
     monkeypatch.setattr(service, "create_template_workbook", lambda: template)
     reports = []
@@ -67,7 +67,7 @@ def test_later_failure_reports_saved_year_and_closes_workbooks(
             raise failure
         wb = small_report(year)
         reports.append(wb)
-        return wb, directory_path / f"Napi_értékesítési_riport_{year}.xlsx"
+        return wb, directory_path / f"Sales_Report_{year}.xlsx"
 
     directory_path = tmp_path
     monkeypatch.setattr(service, "load_year_workbook", load)
@@ -83,15 +83,15 @@ def test_later_failure_reports_saved_year_and_closes_workbooks(
     with pytest.raises(error_type) as error:
         service.import_csv(csv)
     if stage == "save":
-        assert "Már sikeresen elmentett évek: 2025" in str(error.value)
+        assert "Years already saved successfully: 2025" in str(error.value)
         assert "2026" in str(error.value)
         assert error.value.__cause__ is failure
-        assert (tmp_path / "Napi_értékesítési_riport_2025.xlsx").exists()
+        assert (tmp_path / "Sales_Report_2025.xlsx").exists()
     else:
         # All years are loaded before any processing or saving starts.
         assert error.value is failure
-        assert not (tmp_path / "Napi_értékesítési_riport_2025.xlsx").exists()
-    assert not (tmp_path / "Napi_értékesítési_riport_2026.xlsx").exists()
+        assert not (tmp_path / "Sales_Report_2025.xlsx").exists()
+    assert not (tmp_path / "Sales_Report_2026.xlsx").exists()
     template.close.assert_called_once()
     for report in reports:
         report.close.assert_called_once()
@@ -127,7 +127,7 @@ def test_import_closes_all_shared_workbooks_on_early_exit_or_error(
         raise failure
     monkeypatch.setattr(service, "get_exchange_rates", fail if stage == "rates" else lambda **kwargs: {})
     monkeypatch.setattr(service, "_read_processed_documents", fail if stage == "documents" else lambda **kwargs: set())
-    from axelpro_riport.models import ImportResult
+    from sales_report.models import ImportResult
     result = ImportResult([], [], set())
     monkeypatch.setattr(service, "process_movements", fail if stage == "processor" else lambda **kwargs: None if stage == "no_new" else result)
     monkeypatch.setattr(service, "write_import_result", lambda **kwargs: None)
@@ -148,7 +148,7 @@ def test_import_closes_all_shared_workbooks_on_early_exit_or_error(
 
 def test_loads_each_year_once_with_one_shared_template(tmp_path, movement, monkeypatch):
     template = Workbook()
-    template.active.title = "Szeptember"
+    template.active.title = "September"
     template.close = Mock(wraps=template.close)
     create = Mock(return_value=template)
     monkeypatch.setattr(service, "create_template_workbook", create)
@@ -161,7 +161,7 @@ def test_loads_each_year_once_with_one_shared_template(tmp_path, movement, monke
     reports = service._loads_workbooks(rows, tmp_path)
     assert list(reports) == [2025, 2026]
     assert [call["year"] for call in calls] == [2025, 2026]
-    assert all(call["template_sheet"] is template["Szeptember"] for call in calls)
+    assert all(call["template_sheet"] is template["September"] for call in calls)
     assert all("create_if_missing" not in call for call in calls)
     assert [call["months"] for call in calls] == [{1}, {1, 2}]
     create.assert_called_once()

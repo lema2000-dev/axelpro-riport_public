@@ -1,7 +1,7 @@
 import pytest
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
-from axelpro_riport.excel_copy import copy_block
+from sales_report.excel_copy import copy_block
 
 
 @pytest.mark.parametrize(

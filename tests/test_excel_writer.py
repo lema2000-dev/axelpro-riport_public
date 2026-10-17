@@ -1,8 +1,8 @@
 from datetime import date
-from axelpro_riport.excel_create_workbook import create_year_workbook
-from axelpro_riport.excel_writer import write_import_result
-from axelpro_riport.models import DailyTotals, MonthlyTotals, ImportResult
-from axelpro_riport.excel_constants import PROCESSED_DOCUMENTS_SHEET
+from sales_report.excel_create_workbook import create_year_workbook
+from sales_report.excel_writer import write_import_result
+from sales_report.models import DailyTotals, MonthlyTotals, ImportResult
+from sales_report.excel_constants import PROCESSED_DOCUMENTS_SHEET
 
 
 def test_adds_only_selected_year_and_preserves_manual_data_and_formulas(
@@ -14,7 +14,7 @@ def test_adds_only_selected_year_and_preserves_manual_data_and_formulas(
     path = tmp_path / "report.xlsx"
     wb.save(path)
     wb = load_workbook(path)
-    sheet = wb["Január"]
+    sheet = wb["January"]
     sheet["J8"] = 50
     sheet["J7"] = 1234
     formula = sheet["J12"].value

@@ -1,4 +1,4 @@
-"""Napi árfolyamok tárolása és a havi Euro-lap frissítése."""
+"""Store daily exchange rates and update the monthly exchange rate sheet."""
 
 from datetime import date, datetime
 
@@ -12,7 +12,7 @@ def _write_daily_exchange_rates(
     year: int,
     exchange_rates: dict[date, DailyExchangeRate],
 ) -> None:
-    """Az adott év még nem tárolt napi rekordjainak hozzáadása."""
+    """Write daily exchange rates."""
     sheet = workbook[DAILY_EXCHANGE_RATES_SHEET]
 
     stored_dates = {
@@ -48,14 +48,14 @@ def _write_monthly_exchange_rate(
     year: int,
     exchange_rates: dict[date, DailyExchangeRate],
 ) -> None:
-    """Az aktuális hónap árfolyamának és forrásdátumának beírása."""
+    """Write monthly exchange rate."""
     today = date.today()
 
     if year != today.year:
         return
 
     record = exchange_rates[today]
-    sheet = workbook["Euro"]
+    sheet = workbook["Exchange_Rates"]
     row = today.month + 1
 
     sheet.cell(row=row, column=2).value = float(record.rate)
@@ -69,7 +69,7 @@ def write_exchange_rates(
     year: int,
     exchange_rates: dict[date, DailyExchangeRate],
 ) -> WorkbookType:
-    """A napi és havi árfolyamok beírása a munkafüzetbe."""
+    """Store daily rates and update the current monthly rate in the workbook."""
     _write_daily_exchange_rates(
         workbook=workbook,
         year=year,

@@ -1,4 +1,4 @@
-"""Sablon és éves riport betöltése, mentés ideiglenes fájlon keresztül."""
+"""Load, validate and atomically save annual Excel reports."""
 
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -29,23 +29,23 @@ from .calendar_utils import get_month_weeks
 from .template_creator import create_template_workbook
 
 class WorkbookValidationError(ValueError):
-    """Az éves riport fájla vagy tartalma hibás."""
+    """Workbook validation error."""
 
 class WorkbookValidationWarning(Warning):
-    """Az éves riport fájla vagy tartalma figyelmeztetést érdemel."""
+    """Workbook validation warning."""
 
 class WorkbookFileAccessError(OSError):
-    """Az éves riport fájl elérése vagy olvasása sikertelen."""
+    """Workbook file access error."""
 
 class WorkbookSaveError(OSError):
-    """Az éves riport fájl mentése sikertelen."""
+    """Workbook save error."""
 
 def _get_validation_columns(
     sheet: Worksheet,
     months_name: list[str],
 ) -> list[int]:
-    """Az ellenőrzendő oszlopok meghatározása."""
-    if sheet.title == "Összesítő":
+    """Get validation columns."""
+    if sheet.title == "Summary":
         return [
             1,
             *sorted(
@@ -61,12 +61,12 @@ def _validate_required_sheets(
     path: Path,
     months_name: list[str]
 ) -> None:
-    """Az éves riport kötelező munkalapjainak ellenőrzése."""
+    """Validate required sheets."""
 
     required_sheets = [
         *months_name,
-        "Összesítő",
-        "Euro",
+        "Summary",
+        "Exchange_Rates",
         DAILY_EXCHANGE_RATES_SHEET,
         PROCESSED_DOCUMENTS_SHEET,
     ]
@@ -83,12 +83,12 @@ def _validate_required_sheets(
         )
 
         raise WorkbookValidationError(
-            f"Hiányzó vagy átnevezett munkalapok.\n"
-            f"Fájl: {path}\n"
-            f"Elvárt munkalapnevek, amelyek nem találhatók:\n"
+            f"Missing or renamed worksheets.\n"
+            f"File: {path}\n"
+            f"Expected worksheet names not found:\n"
             f"{missing_names}\n"
-            "Ellenőrizd a munkalapneveket. Az átnevezett lapokat "
-            "nevezd vissza; a törölt lapokat állítsd helyre."
+            "Check worksheet names. Rename modified sheets back "
+            "and restore deleted sheets."
         )
 
 def _validate_header_cell(
@@ -98,7 +98,7 @@ def _validate_header_cell(
     expected_value: str | int | date | None,
     path: Path,
 ) -> None:
-    """Egy fejléccella értékének ellenőrzése."""
+    """Validate header cell."""
     cell = sheet.cell(row=row, column=column)
     actual_value = cell.value
 
@@ -107,15 +107,15 @@ def _validate_header_cell(
 
     if actual_value != expected_value:
         raise WorkbookValidationError(
-            f"Hibás fejléc vagy elmozdult táblarész.\n"
-            f"Fájl: {path}\n"
-            f"Munkalap: {sheet.title}\n"
-            f"Cella: {cell.coordinate}\n"
-            f"Jelenlegi érték: {cell.value!r}\n"
-            f"Elvárt érték: {expected_value!r}\n"
-            "Állítsd helyre a megadott cella értékét. "
-            "Ha sorokat vagy oszlopokat szúrtál be vagy töröltél, "
-            "a táblázat eredeti elrendezését is állítsd helyre."
+            f"Invalid header or displaced table section.\n"
+            f"File: {path}\n"
+            f"Worksheet: {sheet.title}\n"
+            f"Cell: {cell.coordinate}\n"
+            f"Current value: {cell.value!r}\n"
+            f"Expected value: {expected_value!r}\n"
+            "Restore the specified cell value. "
+            "If rows or columns were inserted or deleted, "
+            "restore the original table layout as well."
         )
 
 def _validate_month_headers(
@@ -124,25 +124,25 @@ def _validate_month_headers(
     month_name: str,
     path: Path,
 ) -> None:
-    """A havi munkalap heti blokkjainak és havi fejléceinek ellenőrzése."""
+    """Validate month headers."""
     month = MONTH_NAMES.index(month_name) + 1
     weekday_names = (
-        "Hétfő",
-        "Kedd",
-        "Szerda",
-        "Csütörtök",
-        "Péntek",
-        "Szombat",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
     )
 
     expected_cells = {
-        (1, 1): "Dátum:",
-        (3, 1): "Pénznem:",
-        (43, 1): "Dátum:",
-        (43, 2): "Havi záró",
+        (1, 1): "Date:",
+        (3, 1): "Currency:",
+        (43, 1): "Date:",
+        (43, 2): "Monthly total",
         (44, 2): MONTH_NAMES[month - 1],
-        (45, 1): "Pénznem:",
-        (45, 2): "Forint",
+        (45, 1): "Currency:",
+        (45, 2): "HUF",
     }
 
     next_column = 2
@@ -156,15 +156,15 @@ def _validate_month_headers(
         for day in days:
             expected_cells[(1, next_column)] = weekday_names[day.weekday()]
             expected_cells[(2, next_column)] = day
-            expected_cells[(3, next_column)] = "Forint"
+            expected_cells[(3, next_column)] = "HUF"
             next_column += 2
 
-        expected_cells[(1, next_column)] = "Heti záró"
+        expected_cells[(1, next_column)] = "Weekly total"
         expected_cells[(2, next_column)] = days[0].isocalendar().week
-        expected_cells[(3, next_column)] = "Forint"
+        expected_cells[(3, next_column)] = "HUF"
         next_column += 2
 
-    # A fejlécek üres celláiban sem lehet eltérő érték.
+    # Empty header cells must also match the reference.
     for row in (1, 2, 3):
         for column in range(1, next_column):
             expected_cells.setdefault((row, column), None)
@@ -186,13 +186,13 @@ def _validate_other_sheet_headers(
     workbook: WorkbookType,
     path: Path,
 ) -> None:
-    """Az összesítő és a nyilvántartások fejléceinek ellenőrzése."""
-    summary = workbook["Összesítő"]
+    """Validate other sheet headers."""
+    summary = workbook["Summary"]
 
     for row, expected_value in (
-        (1, "Dátum:"),
+        (1, "Date:"),
         (2, None),
-        (3, "Pénznem:"),
+        (3, "Currency:"),
     ):
         _validate_header_cell(
             sheet=summary,
@@ -204,9 +204,9 @@ def _validate_other_sheet_headers(
 
     for column, month_name in enumerate(MONTH_NAMES, start=2):
         for row, expected_value in (
-            (1, "Havi záró"),
+            (1, "Monthly total"),
             (2, month_name),
-            (3, "Forint")
+            (3, "HUF")
         ):
             _validate_header_cell(
                 sheet=summary,
@@ -217,19 +217,19 @@ def _validate_other_sheet_headers(
             )
 
     headers = {
-        "Euro": (
-            "Hónap",
-            "EUR/HUF árfolyam",
-            "Árfolyam dátuma",
+        "Exchange_Rates": (
+            "Month",
+            "EUR/HUF rate",
+            "Rate source date",
         ),
         DAILY_EXCHANGE_RATES_SHEET: (
-            "Alkalmazás dátuma",
-            "Árfolyam dátuma",
-            "EUR/HUF árfolyam",
+            "Application date",
+            "Rate source date",
+            "EUR/HUF rate",
         ),
         PROCESSED_DOCUMENTS_SHEET: (
-            "Év",
-            "Bizonylatszám",
+            "Year",
+            "Document number",
         ),
     }
 
@@ -243,7 +243,7 @@ def _validate_other_sheet_headers(
                 path=path,
             )
 
-    euro = workbook["Euro"]
+    euro = workbook["Exchange_Rates"]
 
     for row, month_name in enumerate(MONTH_NAMES, start=2):
         _validate_header_cell(
@@ -259,7 +259,7 @@ def _validate_merged_ranges(
     reference: WorkbookType,
     path: Path,   
 ) -> None:
-    """A cellaösszevonások ellenőrzése az éves mintához képest."""
+    """Validate merged ranges."""
     for reference_sheet in reference:
         sheet = workbook[reference_sheet.title]
 
@@ -283,27 +283,27 @@ def _validate_merged_ranges(
 
         if missing_ranges:
             details.append(
-                "Hiányzó cellaösszevonások:\n"
+                "Missing merged ranges:\n"
                 + "\n".join(f"  - {value}" for value in missing_ranges)
             )
 
         if unexpected_ranges:
             details.append(
-                "Nem megfelelő cellaösszevonások:\n"
+                "Unexpected merged ranges:\n"
                 + "\n".join(f"  - {value}" for value in unexpected_ranges)
             )
 
         raise WorkbookValidationError(
-            f"Hibás cellaösszevonások.\n"
-            f"Fájl: {path}\n"
-            f"Munkalap: {sheet.title}\n"
+            f"Invalid merged ranges.\n"
+            f"File: {path}\n"
+            f"Worksheet: {sheet.title}\n"
             + "\n".join(details)
-            + "\nSzüntesd meg a nem megfelelő cellaösszevonásokat, "
-            "majd állítsd helyre a hiányzó összevonásokat."
+            + "\nRemove unexpected merged ranges, "
+            "then restore the missing merged ranges."
         )
 
 def _normalize_formula(formula: str) -> str:
-    """Munkalaphivatkozások idézésének egységesítése összehasonlításhoz."""
+    """Normalize formula."""
     parts = []
 
     for token in Tokenizer(formula).items:
@@ -331,10 +331,10 @@ def _validate_labels_and_formulas(
     path: Path,
     months_name: list[str]
 ) -> None:
-    """A rögzített feliratok és képletek ellenőrzése az éves mintához képest."""
-    sheet_names = [*months_name, "Összesítő"]
+    """Validate labels and formulas."""
+    sheet_names = [*months_name, "Summary"]
 
-    # Először a feliratokat, majd a képleteket ellenőrizzük.
+    # Validate labels before formulas.
     for check_formulas in (False, True):
         for sheet_name in sheet_names:
             sheet = workbook[sheet_name]
@@ -345,7 +345,7 @@ def _validate_labels_and_formulas(
                 months_name=months_name,
             )
 
-            if sheet_name == "Összesítő":
+            if sheet_name == "Summary":
                 rows = range(4, 44)
             else:
                 rows = [*range(4, 44), *range(46, 86)]
@@ -377,19 +377,19 @@ def _validate_labels_and_formulas(
                         continue
 
                     description = (
-                        "Hibás vagy hiányzó képlet"
+                        "Invalid or missing formula"
                         if check_formulas else
-                        "Hibás vagy hiányzó felirat"
+                        "Invalid or missing label"
                     )
 
                     raise WorkbookValidationError(
                         f"{description}.\n"
-                        f"Fájl: {path}\n"
-                        f"Munkalap: {sheet_name}\n"
-                        f"Cella: {actual_cell.coordinate}\n"
-                        f"Jelenlegi érték: {actual_cell.value!r}\n"
-                        f"Elvárt érték: {expected_value!r}\n"
-                        "Állítsd helyre a cellát a megadott elvárt értékkel."
+                        f"File: {path}\n"
+                        f"Worksheet: {sheet_name}\n"
+                        f"Cell: {actual_cell.coordinate}\n"
+                        f"Current value: {actual_cell.value!r}\n"
+                        f"Expected value: {expected_value!r}\n"
+                        "Restore the cell to the expected value shown."
                     )
 
 def _validate_empty_cells(
@@ -398,8 +398,8 @@ def _validate_empty_cells(
     path: Path,
     months_name: list[str]
 ) -> None:
-    """Az elválasztó sorok, és az üres felirathelyek ellenőrzése."""
-    for sheet_name in [*months_name, "Összesítő"]:
+    """Validate empty cells."""
+    for sheet_name in [*months_name, "Summary"]:
         sheet = workbook[sheet_name]
         reference_sheet = reference[sheet_name]
 
@@ -408,7 +408,7 @@ def _validate_empty_cells(
                     months_name=months_name,
         )
 
-        if sheet_name == "Összesítő":
+        if sheet_name == "Summary":
             rows = range(4, 44)
         else:
             rows = [*range(4, 44), *range(46, 86)]
@@ -431,14 +431,14 @@ def _validate_empty_cells(
 
                 if cell.value is not None:
                     raise WorkbookValidationError(
-                        f"Érték került egy üresen tartandó cellába.\n"
-                        f"Fájl: {path}\n"
-                        f"Munkalap: {sheet_name}\n"
-                        f"Cella: {cell.coordinate}\n"
-                        f"Jelenlegi érték: {cell.value!r}\n"
-                        "Töröld a cella tartalmát. "
-                        "Ha a táblázat elmozdult, állítsd helyre "
-                        "az eredeti elrendezést."
+                        f"A cell that must remain empty contains a value.\n"
+                        f"File: {path}\n"
+                        f"Worksheet: {sheet_name}\n"
+                        f"Cell: {cell.coordinate}\n"
+                        f"Current value: {cell.value!r}\n"
+                        "Clear the cell contents. "
+                        "If the table has moved, restore "
+                        "the original layout."
                     )
 
 
@@ -448,8 +448,8 @@ def _validate_numeric_cells(
     path: Path,
     months_name: list[str]
 ) -> None:
-    """A kitölthető adatcellák számértékeinek ellenőrzése."""
-    for sheet_name in [*months_name, "Összesítő"]:
+    """Validate numeric cells."""
+    for sheet_name in [*months_name, "Summary"]:
         sheet = workbook[sheet_name]
         reference_sheet = reference[sheet_name]
 
@@ -458,7 +458,7 @@ def _validate_numeric_cells(
             months_name=months_name,
         )
 
-        if sheet_name == "Összesítő":
+        if sheet_name == "Summary":
             rows = range(4, 44)
         else:
             rows = [*range(4, 41), *range(46, 86)]
@@ -469,7 +469,7 @@ def _validate_numeric_cells(
                 for column in columns
             ]
 
-            # Az elválasztó sorokat már ellenőriztük.
+            # Separator rows have already been validated.
             if all(value is None for value in reference_values):
                 continue
 
@@ -487,7 +487,7 @@ def _validate_numeric_cells(
 
                 expected_value = reference_cell.value
 
-                # A rögzített feliratokat és képleteket már ellenőriztük.
+                # Fixed labels and formulas have already been validated.
                 if isinstance(expected_value, str):
                     continue
 
@@ -502,20 +502,20 @@ def _validate_numeric_cells(
                         continue
 
                 raise WorkbookValidationError(
-                    f"Hibás adatcellatartalom.\n"
-                    f"Fájl: {path}\n"
-                    f"Munkalap: {sheet_name}\n"
-                    f"Cella: {cell.coordinate}\n"
-                    f"Jelenlegi érték: {value!r}\n"
-                    "A cella csak számot tartalmazhat, vagy üresen maradhat. "
-                    "Javítsd a tartalmát."
+                    f"Invalid data cell content.\n"
+                    f"File: {path}\n"
+                    f"Worksheet: {sheet_name}\n"
+                    f"Cell: {cell.coordinate}\n"
+                    f"Current value: {value!r}\n"
+                    "The cell must contain a number or remain empty. "
+                    "Correct its contents."
                 )
 
 def _get_column_width(
     sheet: Worksheet,
     column: int,
 ) -> float:
-    """Oszlopszélesség kiolvasása a közös oszloptartományokból is."""
+    """Get column width."""
     for letter, dimension in sheet.column_dimensions.items():
         first_column = dimension.min or column_index_from_string(letter)
         last_column = dimension.max or first_column
@@ -534,14 +534,14 @@ def _validate_formatting_and_dimensions(
     path: Path,
     months_name: list[str]
 ) -> None:
-    """A riport cellaformázásainak és méreteinek ellenőrzése."""
+    """Warn about meaningful differences in styles, row heights and column widths."""
     style_attributes = {
-        "font": "betűformázás",
-        "fill": "kitöltés",
-        "border": "szegély",
-        "alignment": "igazítás",
-        "number_format": "számformátum",
-        "protection": "cellavédelem",
+        "font": "font",
+        "fill": "fill",
+        "border": "border",
+        "alignment": "alignment",
+        "number_format": "number format",
+        "protection": "cell protection",
     }
 
     for reference_sheet in reference:
@@ -571,12 +571,12 @@ def _validate_formatting_and_dimensions(
             ):
                 warnings.warn(
                     (
-                        f"Hibás sormagasság.\n"
-                        f"Fájl: {path}\n"
-                        f"Munkalap: {sheet.title}\n"
-                        f"Sor: {row}\n"
-                        f"Jelenlegi magasság: {actual_height!r}\n"
-                        f"Elvárt magasság: {expected_height!r}"
+                        f"Invalid row height.\n"
+                        f"File: {path}\n"
+                        f"Worksheet: {sheet.title}\n"
+                        f"Row: {row}\n"
+                        f"Current height: {actual_height!r}\n"
+                        f"Expected height: {expected_height!r}"
                     ),
                     category=WorkbookValidationWarning,
                 )
@@ -594,12 +594,12 @@ def _validate_formatting_and_dimensions(
             ):
                 warnings.warn(
                     (
-                        f"Hibás oszlopszélesség.\n"
-                        f"Fájl: {path}\n"
-                        f"Munkalap: {sheet.title}\n"
-                        f"Oszlop: {letter}\n"
-                        f"Jelenlegi szélesség: {actual_width!r}\n"
-                        f"Elvárt szélesség: {expected_width!r}"
+                        f"Invalid column width.\n"
+                        f"File: {path}\n"
+                        f"Worksheet: {sheet.title}\n"
+                        f"Column: {letter}\n"
+                        f"Current width: {actual_width!r}\n"
+                        f"Expected width: {expected_width!r}"
                     ),
                     category=WorkbookValidationWarning,
                 )
@@ -674,19 +674,19 @@ def _validate_formatting_and_dimensions(
                     if actual_style != expected_style:
                         warnings.warn(
                             (
-                            f"Hibás cellaformázás: {description}.\n"
-                            f"Fájl: {path}\n"
-                            f"Munkalap: {sheet.title}\n"
-                            f"Cella: {actual_cell.coordinate}\n"
-                            "Állítsd helyre a cella formázását "
-                            "az eredeti riportmintának megfelelően."
+                            f"Invalid cell formatting: {description}.\n"
+                            f"File: {path}\n"
+                            f"Worksheet: {sheet.title}\n"
+                            f"Cell: {actual_cell.coordinate}\n"
+                            "Restore the cell formatting "
+                            "to match the report template."
                             ),
                             category=WorkbookValidationWarning,
                         )
 
 def _year_workbook_path(directory: str | Path, year: int) -> Path:
-    """Az éves riport célútvonalának összeállítása."""
-    return Path(directory) / f"Napi_értékesítési_riport_{year}.xlsx"
+    """Year workbook path."""
+    return Path(directory) / f"Sales_Report_{year}.xlsx"
 
 def load_year_workbook(
     directory: str | Path,
@@ -694,16 +694,16 @@ def load_year_workbook(
     months: set[int],
     template_sheet: Worksheet,
 ) -> tuple[WorkbookType | None, Path]:
-    """Éves riport betöltése, szükség esetén létrehozással."""
+    """Load and validate an annual report, or create it when it does not exist."""
     path = _year_workbook_path(directory, year)
 
     try:
         file_exists = path.exists()
     except OSError as exc:
         raise WorkbookFileAccessError(
-            f"Az éves riport elérhetősége nem ellenőrizhető.\n"
-            f"Fájl: {path}\n"
-            f"Részletek: {exc}"
+            f"Cannot check annual report availability.\n"
+            f"File: {path}\n"
+            f"Details: {exc}"
         ) from exc
 
     if file_exists:
@@ -711,18 +711,18 @@ def load_year_workbook(
             workbook = load_workbook(path, data_only=False)
         except (InvalidFileException, BadZipFile, ParseError) as exc:
             raise WorkbookValidationError(
-                f"A riport nem nyitható meg Excel-munkafüzetként.\n"
-                f"Fájl: {path}\n"
-                f"Részletek: {exc}\n"
-                "Ellenőrizd, hogy Excelben megnyitható-e. "
-                "Ha igen, mentsd újra .xlsx formátumban."
+                f"The report cannot be opened as an Excel workbook.\n"
+                f"File: {path}\n"
+                f"Details: {exc}\n"
+                "Check whether it can be opened in Excel. "
+                "If so, save it again in .xlsx format."
             ) from exc
         except OSError as exc:
             raise WorkbookFileAccessError(
-                f"Az éves riport megnyitása vagy olvasása nem sikerült.\n"
-                f"Fájl: {path}\n"
-                f"Részletek: {exc}\n"
-                "Ellenőrizd a fájl elérhetőségét és olvasási jogosultságát."
+                f"Could not open or read the annual report.\n"
+                f"File: {path}\n"
+                f"Details: {exc}\n"
+                "Check file availability and read permissions."
             ) from exc
 
         validation_completed = False
@@ -748,7 +748,7 @@ def load_year_workbook(
 
             try:
                 reference = create_partial_year_workbook(
-                    template_sheet=template["Szeptember"],
+                    template_sheet=template["September"],
                     year=year,
                     months=months,
                 )
@@ -771,7 +771,7 @@ def load_year_workbook(
                 workbook.close()
 
             elapsed = perf_counter() - start
-            print(f"Az munkafüzet ellenőrzésének futási ideje: {elapsed:.2f} másodperc")
+            print(f"Workbook validation duration: {elapsed:.2f} seconds")
 
 
     else:
@@ -783,7 +783,7 @@ def load_year_workbook(
             )
         finally:
             elapsed = perf_counter() - start
-            print(f"Az új munkafüzet létrehozásának futási ideje: {elapsed:.2f} másodperc") 
+            print(f"Workbook creation duration: {elapsed:.2f} seconds") 
 
     return workbook, path
 
@@ -791,7 +791,7 @@ def save_workbook(
     path: str | Path,
     workbook: WorkbookType,
 ) -> None:
-    """Mentés ideiglenes fájlba, majd a célfájl cseréje."""
+    """Save through a temporary file, then replace the destination workbook."""
     path = Path(path)
     temporary_path = None
 
@@ -811,11 +811,11 @@ def save_workbook(
 
     except OSError as exc:
         raise WorkbookSaveError(
-            f"Az éves riport mentése nem sikerült.\n"
-            f"Fájl: {path}\n"
-            f"Részletek: {exc}\n"
-            "Ellenőrizd az írási jogosultságot, a szabad lemezterületet "
-            "és azt, hogy a fájl nincs-e zárolva egy másik programban."
+            f"Could not save the annual report.\n"
+            f"File: {path}\n"
+            f"Details: {exc}\n"
+            "Check write permissions, available disk space "
+            "and whether another application has locked the file."
         ) from exc
 
     finally:

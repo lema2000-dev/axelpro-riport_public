@@ -1,13 +1,13 @@
-"""A grafikus felület által átadott callbackek és megszakítások."""
+"""Test import callbacks."""
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 import pytest
-from axelpro_riport import import_service as service, rates_read_and_correction as rates
-from axelpro_riport.csv_reader import CsvFormatError
-from axelpro_riport.models import DailyExchangeRate, ImportResult
+from sales_report import import_service as service, rates_read_and_correction as rates
+from sales_report.csv_reader import CsvFormatError
+from sales_report.models import DailyExchangeRate, ImportResult
 
 
 @pytest.fixture
@@ -77,14 +77,14 @@ def test_no_new_items_use_message_callback_without_preview(prepared):
     message = Mock()
     preview = Mock()
     service.import_csv('input.csv', show_message=message, confirm_preview=preview, check_cancelled=lambda: None)
-    message.assert_called_once_with('Nincs új tétel az importáláshoz.')
+    message.assert_called_once_with('There are no new items to import.')
     preview.assert_not_called()
     prepared.save.assert_not_called()
     prepared.wb.close.assert_called_once()
 
 
 def test_csv_format_error_preserves_message_and_cause(monkeypatch):
-    failure = ValueError('Hiba a(z) 4. sorban: Hibás dátum')
+    failure = ValueError('Error on line 4: Invalid date')
     monkeypatch.setattr(service, 'read_movements', Mock(side_effect=failure))
     with pytest.raises(CsvFormatError) as error:
         service.import_csv('input.csv')
@@ -115,7 +115,7 @@ def test_missing_rates_call_custom_input(monkeypatch):
 
 def test_ungrouped_decision_callback_is_forwarded_to_csv_reader(prepared, monkeypatch):
     reader = Mock(return_value=prepared.rows)
-    decide = Mock(return_value="Új alkatrész")
+    decide = Mock(return_value="New parts")
     monkeypatch.setattr(service, "read_movements", reader)
     service.import_csv("input.csv", request_missing_group=decide, confirm_preview=Mock(return_value=False))
     assert reader.call_args.kwargs["request_missing_group"] is decide

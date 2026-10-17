@@ -1,4 +1,4 @@
-"""A program terminálon keresztüli kezelése."""
+"""Console interface for sales report imports and application settings."""
 
 from time import perf_counter
 from pathlib import Path
@@ -33,70 +33,70 @@ def _request_missing_group(
     document_number: str,
     item_code: str,
 ) -> str:
-    """Csoport kiválasztása egy csoport nélküli számlatételhez."""
+    """Ask the user to classify an invoice item with an empty group."""
     groups = {
-        "1": "Új alkatrész",
-        "2": "Bontott alkatrész",
-        "3": "Munkadíj",
-        "4": "Szállítási költség",
+        "1": "New parts",
+        "2": "Used parts",
+        "3": "Labor",
+        "4": "Shipping",
         "5": "Trailer",
         "0": ""
     }
 
     print(
-        "\nEnnek a számlatételnek nincs csoportja:\n"
-        f"Bizonylatszám: {document_number}\n"
-        f"Cikkszám: {item_code}\n"
+        "\nThis invoice item has no group:\n"
+        f"Document number: {document_number}\n"
+        f"Item code: {item_code}\n"
     )
-    print("1 – Új alkatrész")
-    print("2 – Bontott alkatrész")
-    print("3 – Munkadíj")
-    print("4 – Szállítási költség")
+    print("1 – New parts")
+    print("2 – Used parts")
+    print("3 – Labor")
+    print("4 – Shipping")
     print("5 – Trailer")
-    print("0 – Egyik sem")
+    print("0 – None of these")
 
     while True:
-        choice = input("Válassz egy csoportot: ").strip()
+        choice = input("Select a group: ").strip()
 
         if choice in groups:
             return groups[choice]
         
-        print("Érvénytelen választás. Adj meg egy számot 0 és 5 között.")
+        print("Invalid selection. Enter a number from 0 to 5.")
 
 
 def _request_directory(
     *,
     first_open: bool = False,
 ) -> str | None:
-    """Létező riportkönyvtár bekérése."""
+    """Request directory."""
     while True:
         if not first_open:
-            print("A könyvtár módosításának megszakítása: 0")
+            print("Cancel folder change: 0")
 
-        value = input("A riportok könyvtárának útvonala: ").strip()
+        value = input("Report folder path: ").strip()
 
         if not first_open and value == "0":
-            print("A könyvtár módosítása megszakítva.")
+            print("Folder change cancelled.")
             return None
 
         if not value:
-            print("Adj meg egy könyvtárútvonalat.")
+            print("Enter a folder path.")
             continue
 
         try:
             path = Path(value).expanduser()
 
             if not path.is_dir():
-                print("A megadott útvonal nem létező könyvtár. Próbáld újra.")
+                print("The path is not an existing folder. Try again.")
                 continue
 
             resolved_path = path.resolve()
 
         except (OSError, RuntimeError, ValueError) as exc:
             print(
-                f"A könyvtár útvonala nem ellenőrizhető: {value!r}\n"
-                f"Részletek: {exc}\n"
-                "Próbáld újra."
+                f"Cannot check the folder path: {value!r}\n"
+                f"Details: {exc}\n"
+                "Try again."
             )
             continue
 
@@ -107,126 +107,126 @@ def _request_new_part_groups(
     allow_empty: bool = False,
     first_open: bool = False,
 ) -> list[str] | None:
-    """Újalkatrész-csoportok bekérése pontosvesszővel elválasztva."""
+    """Request new part groups."""
     while True:
         if not first_open:
-            print("Az újalkatrész-csoportok megadásának megszakítása: 0")
+            print("Cancel category entry: 0")
         
         value = input(
-            "Újalkatrész-csoportok pontosvesszővel elválasztva: "
+            "New-part categories separated by semicolons: "
         ).strip()
 
         if value == "0":
             if first_open:
-                print("Adj meg csoportneveket, vagy hagyd üresen a listát.")
+                print("Enter category names or leave the list empty.")
                 continue
 
-            print("Az újalkatrész-csoportok megadásának folyamata megszakítva.")
+            print("Category entry cancelled.")
             return None
 
         if not value:
             if allow_empty:
                 return []
 
-            print("Adj meg legalább egy csoportnevet.")
+            print("Enter at least one category name.")
             continue
 
         groups = [group.strip() for group in value.split(";")]
 
         if any(not group for group in groups):
-            print("Az elválasztók között nem lehet üres csoportnév.")
+            print("Category names between separators must not be empty.")
             continue
 
         if len(groups) != len(set(groups)):
-            print("Egy csoportnevet csak egyszer adj meg.")
+            print("Enter each category name only once.")
             continue
 
         return groups
 
 def _request_removed_part_groups(
 ) -> list[str] | None:
-    """Az eltávolítandó újalkatrész-csoportok bekérése pontosvesszővel elválasztva."""
+    """Request removed part groups."""
     while True:
-        print("Az eltávolítás megszakítása: 0")
+        print("Cancel removal: 0")
         value = input(
-            "Eltávolítandó újalkatrész-csoportok pontosvesszővel elválasztva: "
+            "Categories to remove, separated by semicolons: "
         ).strip()
 
         if value == "0":
-            print("Az eltávolítás megszakítva.")
+            print("Removal cancelled.")
             return None
 
         if not value:
-            print("Adj meg legalább egy csoportnevet.")
+            print("Enter at least one category name.")
             continue
 
         groups = [group.strip() for group in value.split(";")]
 
         if any(not group for group in groups):
-            print("Az elválasztók között nem lehet üres csoportnév.")
+            print("Category names between separators must not be empty.")
             continue
 
         if len(groups) != len(set(groups)):
-            print("Egy csoportnevet csak egyszer adj meg.")
+            print("Enter each category name only once.")
             continue
 
         return groups
         
 
 def _request_csv_path() -> str | None:
-    """Létező CSV-fájl útvonalának bekérése."""
+    """Request csv path."""
     while True:
-        print("Az importálás megszakítása: 0")
-        value = input("Az importálandó CSV-fájl útvonala: ").strip()
+        print("Cancel import: 0")
+        value = input("Path to the CSV file to import: ").strip()
 
         if value == "0":
-            print("Az importálás megszakítva.")
+            print("Import cancelled.")
             return None
 
         if not value:
-            print("Adj meg egy fájlútvonalat.")
+            print("Enter a file path.")
             continue
 
         try:
             path = Path(value).expanduser()
 
             if not path.is_file():
-                print("A megadott útvonal nem létező fájl. Próbáld újra.")
+                print("The path is not an existing file. Try again.")
                 continue
 
             if path.suffix.lower() != ".csv":
-                print("Az importálandó fájlnak .csv fájlnak kell lennie.")
+                print("The import file must have the .csv extension.")
                 continue
 
             resolved_path = path.resolve()
 
         except (OSError, RuntimeError, ValueError) as exc:
             print(
-                f"A CSV-fájl útvonala nem ellenőrizhető: {value!r}\n"
-                f"Részletek: {exc}\n"
-                "Próbáld újra."
+                f"Cannot check the CSV file path: {value!r}\n"
+                f"Details: {exc}\n"
+                "Try again."
             )
             continue
 
         return str(resolved_path)
 
 def _ensure_settings() -> None:
-    """A beállításfájl létrehozása, ha még nem létezik."""
+    """Ensure settings."""
     path = settings_path()
 
     try:
         file_exists = path.exists()
     except OSError as exc:
         raise SettingsFileAccessError(
-            f"A beállításfájl elérhetősége nem ellenőrizhető.\n"
-            f"Fájl: {path}\n"
-            f"Részletek: {exc}"
+            f"Cannot check settings file availability.\n"
+            f"File: {path}\n"
+            f"Details: {exc}"
         ) from exc
 
     if file_exists:
         return
 
-    print("\nElső indítás: add meg a program beállításait.")
+    print("\nFirst launch: enter the application settings.")
 
     output_directory = _request_directory(first_open=True)
     groups = _request_new_part_groups(allow_empty=True, first_open=True)
@@ -236,7 +236,7 @@ def _ensure_settings() -> None:
         additional_new_part_groups=groups,
     )
 
-    print("A beállításokat elmentettük.")
+    print("Settings saved.")
 
 def _handle_settings_error(
     error: (
@@ -248,8 +248,8 @@ def _handle_settings_error(
         | SettingsSaveError
     ),
 ) -> None:
-    """A hibás beállítások javításához szükséges adatok bekérése."""
-    print(f"Beállítási hiba: {error}")
+    """Handle settings error."""
+    print(f"Settings error: {error}")
 
     try:
         if isinstance(error, SettingsFileMissingError):
@@ -257,15 +257,15 @@ def _handle_settings_error(
 
         elif isinstance(error, SettingsFileAccessError):
             print(
-                "Ellenőrizd a fájl és a beállításmappa "
-                "hozzáférési jogosultságait, majd próbáld újra."
+                "Check the file and settings folder "
+                "access permissions, then try again."
             )
 
         elif isinstance(error, SettingsSaveError):
             print(
-                "Ellenőrizd a beállításmappa írási jogosultságát "
-                "és a rendelkezésre álló lemezterületet, "
-                "majd próbáld újra."
+                "Check write permissions for the settings folder "
+                "and the available disk space, "
+                "then try again."
             )
 
         elif isinstance(error, SettingsStructureError):
@@ -280,11 +280,11 @@ def _handle_settings_error(
                     output_directory=directory,
                     validate_settings=False,
                 )
-                print("Az új riportkönyvtárat elmentettük.")
+                print("New report folder saved.")
 
         elif isinstance(error, SettingsGroupsError):
             if isinstance(error.groups, list):
-                print("A jelenleg tárolt elemek:")
+                print("Currently stored items:")
 
                 for group in error.groups:
                     print(f"  {group!r}")
@@ -293,7 +293,7 @@ def _handle_settings_error(
 
             if groups is not None:
                 replace_new_part_groups(groups=groups)
-                print("Az új csoportlistát elmentettük.")
+                print("New category list saved.")
 
     except (
         SettingsStructureError,
@@ -304,10 +304,10 @@ def _handle_settings_error(
         SettingsSaveError,
         SettingsResetError,
     ) as exc:
-        print(f"A beállítások javítása nem sikerült: {exc}")
+        print(f"Could not repair settings: {exc}")
 
 def run_console() -> None:
-    """A program indítása és a terminálmenü kezelése."""
+    """Ensure settings exist and process console menu actions until exit."""
     try:
         _ensure_settings()
     except (SettingsFileAccessError, SettingsSaveError) as exc:
@@ -316,16 +316,16 @@ def run_console() -> None:
 
     try:
         while True:
-            print("\n=== AxelPro riport ===")
-            print("1 – Importálás")
-            print("2 – Újalkatrész-csoport hozzáadása")
-            print("3 – Újalkatrész-csoport eltávolítása")
-            print("4 – Riport mappa módosítása")
-            print("5 – Jelenlegi beállítások megtekintése")
-            print("6 – Alaphelyzetbe állítás és bezárás")
-            print("0 – Kilépés")
+            print("\n=== Sales Report ===")
+            print("1 – Import")
+            print("2 – Add new-part categories")
+            print("3 – Remove new-part categories")
+            print("4 – Change report folder")
+            print("5 – View current settings")
+            print("6 – Reset and close")
+            print("0 – Exit")
 
-            choice = input("Válassz egy műveletet: ").strip()
+            choice = input("Select an action: ").strip()
 
             if choice == "1":
                 csv_path = _request_csv_path()
@@ -343,7 +343,7 @@ def run_console() -> None:
                             import_csv(csv_path=csv_path, request_missing_group=_request_missing_group)
                         finally:
                             elapsed = perf_counter() - start
-                            print(f"Az importálás futási ideje: {elapsed:.2f} másodperc")
+                            print(f"Import duration: {elapsed:.2f} seconds")
                 except (
                     SettingsStructureError,
                     SettingsDirectoryError,
@@ -356,22 +356,22 @@ def run_console() -> None:
                     continue
 
                 except ValueError as exc:
-                    print(f"Importálási hiba: {exc}")
+                    print(f"Import error: {exc}")
                     continue
 
                 except CsvFileAccessError as exc:
-                    print(f"Importálási hiba: {exc}")
+                    print(f"Import error: {exc}")
                     continue
 
                 except WorkbookFileAccessError as exc:
-                    print(f"Importálási hiba: {exc}")
+                    print(f"Import error: {exc}")
                     continue
 
                 except WorkbookSaveError as exc:
-                    print(f"Importálási hiba: {exc}")
+                    print(f"Import error: {exc}")
                     continue
 
-                print("Az importálási folyamat befejeződött.")
+                print("Import process completed.")
 
                 first_warning = next(
                     (
@@ -386,7 +386,7 @@ def run_console() -> None:
                 )
 
                 if first_warning is not None:
-                    print(f"\nFigyelmeztetés: {first_warning.message}")
+                    print(f"\nWarning: {first_warning.message}")
 
             elif choice == "2":
                 groups = _request_new_part_groups()
@@ -407,7 +407,7 @@ def run_console() -> None:
                     _handle_settings_error(exc)
                     continue
 
-                print("A csoportlistát elmentettük.")
+                print("Category list saved.")
 
             elif choice == "3":
                 groups = _request_removed_part_groups()
@@ -428,7 +428,7 @@ def run_console() -> None:
                     _handle_settings_error(exc)
                     continue
 
-                print("A csoportlistát elmentettük.")
+                print("Category list saved.")
 
             elif choice == "4":
                 directory = _request_directory()
@@ -449,7 +449,7 @@ def run_console() -> None:
                     _handle_settings_error(exc)
                     continue
 
-                print("Az új riportkönyvtárat elmentettük.")
+                print("New report folder saved.")
 
             elif choice == "5":
                 try:
@@ -465,20 +465,20 @@ def run_console() -> None:
                     _handle_settings_error(exc)
                     continue
 
-                print(f"\nRiportkönyvtár: {settings.output_directory}")
-                print("További újalkatrész-csoportok:")
+                print(f"\nReport folder: {settings.output_directory}")
+                print("Additional new-part categories:")
 
                 if settings.additional_new_part_groups:
                     for group in settings.additional_new_part_groups:
                         print(f"  {group}")
                 else:
-                    print("  Nincsenek további csoportok.")
+                    print("  No additional categories.")
 
             elif choice == "6":
                 try:
                     reset()
                 except SettingsResetError as exc:
-                    print(f"Az alaphelyzetbe állítás nem sikerült: {exc}")
+                    print(f"Could not reset the application: {exc}")
                     continue
 
                 return
@@ -487,7 +487,7 @@ def run_console() -> None:
                 return
 
             else:
-                print("Érvénytelen választás. Próbáld újra.")
+                print("Invalid selection. Try again.")
     except KeyboardInterrupt:
         return
 

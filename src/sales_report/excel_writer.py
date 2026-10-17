@@ -1,4 +1,4 @@
-"""Az import eredményeinek beírása az éves munkafüzetbe."""
+"""Write import results and document identities into annual reports."""
 
 from datetime import date, datetime
 
@@ -17,7 +17,7 @@ def _find_day_column(
     sheet: Worksheet,
     target_date: date,
 ) -> int:
-    """A megadott dátum oszlopszámának megkeresése."""
+    """Find day column."""
     for cell in sheet[2]:
         value = cell.value
 
@@ -33,7 +33,7 @@ def _add_cell_amount(
     column: int,
     amount: int,
 ) -> None:
-    """Az új összeg hozzáadása a cella meglévő értékéhez."""
+    """Add cell amount."""
     cell = sheet.cell(row=row, column=column)
 
     current_value = cell.value
@@ -47,7 +47,7 @@ def _write_daily_totals(
     sheet: Worksheet,
     totals: DailyTotals,
 ) -> None:
-    """A napi növekmények hozzáadása a megfelelő cellákhoz."""
+    """Write daily totals."""
     column = _find_day_column(
         sheet=sheet,
         target_date=totals.movement_date,
@@ -67,7 +67,7 @@ def _write_monthly_totals(
     sheet: Worksheet,
     totals: MonthlyTotals,
 ) -> None:
-    """A havi növekmények hozzáadása a havi záró celláihoz."""
+    """Write monthly totals."""
     for field_name, row in MONTHLY_TARGET_ROWS.items():
         amount = getattr(totals, field_name)
 
@@ -83,7 +83,7 @@ def _write_processed_documents(
     year: int,
     new_documents: set[tuple[int, str]],
 ) -> None:
-    """Az adott év új bizonylatkulcsainak rögzítése."""
+    """Write processed documents."""
     sheet = workbook[PROCESSED_DOCUMENTS_SHEET]
 
     for document_year, document_number in sorted(new_documents):
@@ -95,7 +95,7 @@ def write_import_result(
     year: int,
     result: ImportResult,
 ) -> WorkbookType:
-    """Az adott év importeredményeinek beírása a munkafüzetbe."""
+    """Apply annual totals and new document identities, returning the workbook."""
     for totals in result.daily_totals:
         if totals.movement_date.year == year:
             month = totals.movement_date.month

@@ -1,4 +1,4 @@
-"""Valódi Tkinter-elemek ellenőrzése; grafikus kijelző szükséges."""
+"""Test gui widgets."""
 from datetime import date
 from pathlib import Path
 from queue import Queue
@@ -6,8 +6,8 @@ from unittest.mock import Mock
 import tkinter as tk
 from tkinter import ttk
 import pytest
-from axelpro_riport import gui
-from axelpro_riport.models import ImportResult
+from sales_report import gui
+from sales_report.models import ImportResult
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def widget_app(monkeypatch):
     try:
         root = tk.Tk()
     except tk.TclError as exc:
-        pytest.skip(f'Grafikus kijelző nem érhető el: {exc}')
+        pytest.skip(f'Graphical display unavailable: {exc}')
     root.geometry('420x700')
     app = gui._Application.__new__(gui._Application)
     app.root = root
@@ -27,7 +27,7 @@ def widget_app(monkeypatch):
     app._ui_requests = Queue()
     for name in ('showerror', 'showinfo', 'showwarning'):
         monkeypatch.setattr(gui.messagebox, name, Mock())
-    # A párbeszédablakok valódi elemek, a felhasználói műveleteket vezéreljük.
+    # Use real dialogs with simulated user actions.
     monkeypatch.setattr(tk.Toplevel, 'wait_visibility', lambda self: self.update_idletasks())
     monkeypatch.setattr(tk.Toplevel, 'grab_set', lambda self: None)
     try:
@@ -58,9 +58,9 @@ def test_menu_has_seven_sibling_buttons_with_expected_size(widget_app):
     buttons = [w for w in descendants(app.main_frame) if isinstance(w, ttk.Button)]
     assert len(buttons) == 7
     assert [w.cget('text').replace('\n', ' ') for w in buttons] == [
-        'Importálás', 'Újalkatrész- csoport hozzáadása', 'Újalkatrész- csoport eltávolítása',
-        'Riportmappa módosítása', 'Jelenlegi beállítások megtekintése', 'Kilépés',
-        'Alaphelyzetbe állítás és bezárás']
+        'Import', 'Add new-part categories', 'Remove new-part categories',
+        'Change report folder', 'View current settings', 'Exit',
+        'Reset and close']
     assert len({w.master.master for w in buttons}) == 1
     for w in buttons:
         assert w.winfo_width() == 240
@@ -68,36 +68,36 @@ def test_menu_has_seven_sibling_buttons_with_expected_size(widget_app):
     assert app.import_button is buttons[0]
 
 
-@pytest.mark.parametrize('text,first_open,expected', [('Szűrők; Olaj', False, ['Szűrők', 'Olaj']), ('', True, [])])
+@pytest.mark.parametrize('text,first_open,expected', [('Filters; Oil', False, ['Filters', 'Oil']), ('', True, [])])
 def test_group_dialog_waits_for_submission(widget_app, monkeypatch, text, first_open, expected):
     def drive(window):
         entries = [w for w in descendants(window) if isinstance(w, ttk.Entry)]
         entries[0].insert(0, text)
         if first_open:
-            assert all(w.cget('text') != 'Megszakítás' for w in descendants(window) if isinstance(w, ttk.Button))
-        button(window, 'Kész').invoke()
+            assert all(w.cget('text') != 'Cancel' for w in descendants(window) if isinstance(w, ttk.Button))
+        button(window, 'Done').invoke()
         assert not window.winfo_exists()
     monkeypatch.setattr(widget_app.root, 'wait_window', drive)
-    assert widget_app._request_groups(title='Groups', button_text='Kész', first_open=first_open) == expected
+    assert widget_app._request_groups(title='Groups', button_text='Done', first_open=first_open) == expected
 
 
-@pytest.mark.parametrize('invalid', ['', 'A;;B', 'Szűrők;szűrők'])
+@pytest.mark.parametrize('invalid', ['', 'A;;B', 'Filters;filters'])
 def test_group_error_clears_entry_and_allows_retry(widget_app, monkeypatch, invalid):
     def drive(window):
         entry = next(w for w in descendants(window) if isinstance(w, ttk.Entry))
         entry.insert(0, invalid)
-        button(window, 'Hozzáadás').invoke()
+        button(window, 'Add').invoke()
         gui.messagebox.showerror.assert_called_once()
         assert window.winfo_exists() and entry.get() == ''
-        entry.insert(0, 'Szűrők')
-        button(window, 'Hozzáadás').invoke()
+        entry.insert(0, 'Filters')
+        button(window, 'Add').invoke()
     monkeypatch.setattr(widget_app.root, 'wait_window', drive)
-    assert widget_app._request_groups(title='Groups', button_text='Hozzáadás') == ['Szűrők']
+    assert widget_app._request_groups(title='Groups', button_text='Add') == ['Filters']
 
 
 def test_group_cancel_returns_none(widget_app, monkeypatch):
-    monkeypatch.setattr(widget_app.root, 'wait_window', lambda window: button(window, 'Megszakítás').invoke())
-    assert widget_app._request_groups(title='Groups', button_text='Hozzáadás') is None
+    monkeypatch.setattr(widget_app.root, 'wait_window', lambda window: button(window, 'Cancel').invoke())
+    assert widget_app._request_groups(title='Groups', button_text='Add') is None
 
 
 def test_rate_dialog_validates_number_and_date_independently(widget_app, monkeypatch):
@@ -105,13 +105,13 @@ def test_rate_dialog_validates_number_and_date_independently(widget_app, monkeyp
         rate, source = [w for w in descendants(window) if isinstance(w, ttk.Entry)]
         rate.insert(0, 'abc')
         source.insert(0, '2026-02-30')
-        button(window, 'Kész').invoke()
+        button(window, 'Done').invoke()
         assert rate.get() == '' and source.get() == '2026-02-30'
         rate.insert(0, '400,25')
-        button(window, 'Kész').invoke()
+        button(window, 'Done').invoke()
         assert rate.get() == '400,25' and source.get() == ''
         source.insert(0, '2026-10-13')
-        button(window, 'Kész').invoke()
+        button(window, 'Done').invoke()
     monkeypatch.setattr(widget_app.root, 'wait_window', drive)
     record = widget_app._request_rate(date(2026, 9, 18))
     assert str(record.rate) == '400.25'
@@ -125,7 +125,7 @@ def test_rate_close_cancels_import(widget_app, monkeypatch):
         widget_app._request_rate(date(2026, 9, 18))
 
 
-@pytest.mark.parametrize('decision,expected', [('Elfogadás', True), ('Elutasítás', False), ('close', False)])
+@pytest.mark.parametrize('decision,expected', [('Accept', True), ('Reject', False), ('close', False)])
 def test_preview_buttons_and_close(widget_app, monkeypatch, decision, expected):
     def drive(window):
         assert len([w for w in descendants(window) if isinstance(w, ttk.Treeview)]) == 1
@@ -139,25 +139,25 @@ def test_preview_buttons_and_close(widget_app, monkeypatch, decision, expected):
 
 def test_directory_selection_returns_selected_path(widget_app, monkeypatch, tmp_path):
     monkeypatch.setattr(gui.filedialog, 'askdirectory', lambda **kwargs: str(tmp_path))
-    monkeypatch.setattr(widget_app.root, 'wait_window', lambda window: button(window, 'Tallózás').invoke())
+    monkeypatch.setattr(widget_app.root, 'wait_window', lambda window: button(window, 'Browse').invoke())
     assert widget_app._request_directory() == str(tmp_path.resolve())
 
 
 @pytest.mark.parametrize("label,expected", [
-    ("Új alkatrész", "Új alkatrész"),
-    ("Bontott alkatrész", "Bontott alkatrész"),
-    ("Munkadíj", "Munkadíj"),
-    ("Szállítási költség", "Szállítási költség"),
+    ("New parts", "New parts"),
+    ("Used parts", "Used parts"),
+    ("Labor", "Labor"),
+    ("Shipping", "Shipping"),
     ("Trailer", "Trailer"),
-    ("Egyik sem", ""),
+    ("None of these", ""),
 ])
 def test_missing_group_dialog_has_six_choices_and_returns_selected_group(widget_app, monkeypatch, label, expected):
     def drive(window):
         widgets = descendants(window)
         buttons = [w for w in widgets if isinstance(w, ttk.Button)]
         assert [w.cget("text") for w in buttons] == [
-            "Új alkatrész", "Bontott alkatrész", "Munkadíj",
-            "Szállítási költség", "Trailer", "Egyik sem",
+            "New parts", "Used parts", "Labor",
+            "Shipping", "Trailer", "None of these",
         ]
         text = "\n".join(w.cget("text") for w in widgets if isinstance(w, ttk.Label))
         assert "DOC-123" in text and "ITEM-456" in text
@@ -168,7 +168,7 @@ def test_missing_group_dialog_has_six_choices_and_returns_selected_group(widget_
 
 
 def test_missing_group_window_close_cancels_instead_of_returning_function(widget_app, monkeypatch):
-    # A destroy az ablakkezelő alapértelmezett X-es bezárását modellezi.
+    # Destroy simulates closing the dialog with its title-bar button.
     monkeypatch.setattr(widget_app.root, "wait_window", lambda window: window.destroy())
     with pytest.raises(gui._ImportCancelled):
         widget_app._request_missing_group("DOC", "ITEM")

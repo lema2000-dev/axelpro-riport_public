@@ -1,4 +1,4 @@
-"""Heti blokkok, havi lapok és az éves összesítő felépítése."""
+"""Build full or partial annual workbooks from the embedded template."""
 
 from datetime import date
 from openpyxl import Workbook
@@ -21,12 +21,12 @@ from .excel_copy import copy_block
 
 
 def _get_day_start_column(week_start_column: int, *, include_labels: bool) -> int:
-    """A napi oszlopok kezdete, az esetleges sorfeliratok után."""
+    """Get day start column."""
     return week_start_column + int(include_labels)
 
 
 def _get_week_trim_counts(week: list[date]) -> tuple[int, int]:
-    """A hiányzó hétfő–szombati napok száma a hét két szélén."""
+    """Get week trim counts."""
     weekdays = [day.weekday() for day in week if day.weekday() < 6]
     if not weekdays:
         return (6, 0)
@@ -41,7 +41,7 @@ def _copy_week_days(
     week: list[date],
     target_start_column: int,
 ) -> int:
-    """A hónap saját hétfő–szombati napjainak másolása."""
+    """Copy week days."""
     leading_days, trailing_days = _get_week_trim_counts(week)
     day_count = 6 - leading_days - trailing_days
     if day_count == 0:
@@ -69,7 +69,7 @@ def _copy_week_days(
 def _copy_week_closing(
     template_sheet: Worksheet, target_sheet: Worksheet, target_start_column: int
 ) -> None:
-    """A heti záró fejléceinek és üres adatcelláinak másolása."""
+    """Copy week closing."""
     for min_row, max_row, clear_values in (
         (WEEK_START_ROW, 3, False),
         (4, WEEK_END_ROW, True),
@@ -91,7 +91,7 @@ def _copy_week_closing(
 def _set_week_dates(
     sheet: Worksheet, week: list[date], week_start_column: int, *, include_labels: bool
 ) -> None:
-    """A hónaphoz tartozó dátumok és az ISO-hétszám beírása."""
+    """Set week dates."""
     days = [day for day in week if day.weekday() < 6]
     if not days:
         return
@@ -111,7 +111,7 @@ def _set_week_closing_formulas(
     day_start_column: int,
     day_count: int,
 ) -> None:
-    """A heti összegek újraépítése a ténylegesen jelen lévő napokból."""
+    """Set week closing formulas."""
     closing_column = day_start_column + day_count * 2
     for row in range(4, WEEK_END_ROW + 1):
         for currency_offset in (0, 1):
@@ -135,7 +135,7 @@ def _create_week_block(
     *,
     include_labels: bool,
 ) -> int:
-    """Egy heti blokk létrehozása; a felhasznált oszlopok számát adja vissza."""
+    """Create week block."""
     leading_days, trailing_days = _get_week_trim_counts(week)
     day_count = 6 - leading_days - trailing_days
     if day_count == 0:
@@ -184,7 +184,7 @@ def _create_week_block(
 def _create_month_weeks(
     template_sheet: Worksheet, target_sheet: Worksheet, year: int, month: int
 ) -> list[int]:
-    """A hónap heti blokkjai; visszaadja a heti zárók kezdőoszlopait."""
+    """Create month weeks."""
     next_column = 1
     include_labels = True
     closing_columns = []
@@ -207,7 +207,7 @@ def _create_month_weeks(
 def _build_monthly_sum(
     closing_columns: list[int], source_row: int, *, currency_offset: int = 0
 ) -> str:
-    """A heti zárókat összeadó képletrész összeállítása."""
+    """Build monthly sum."""
     references = [
         f"{get_column_letter(column + currency_offset)}{source_row}"
         for column in closing_columns
@@ -216,7 +216,7 @@ def _build_monthly_sum(
 
 
 def _copy_monthly_close(template_sheet: Worksheet, target_sheet: Worksheet) -> None:
-    """A havi záró feliratainak, fejléceinek és képleteinek másolása."""
+    """Copy monthly close."""
     copy_block(
         source_sheet=template_sheet,
         target_sheet=target_sheet,
@@ -245,7 +245,7 @@ def _copy_monthly_close(template_sheet: Worksheet, target_sheet: Worksheet) -> N
 
 
 def _set_monthly_basic_formulas(sheet: Worksheet, closing_columns: list[int]) -> None:
-    """A forintos havi összegek képleteinek beállítása."""
+    """Set monthly basic formulas."""
     row_mapping = {
         46: 12,
         47: 13,
@@ -270,7 +270,7 @@ def _set_monthly_basic_formulas(sheet: Worksheet, closing_columns: list[int]) ->
 def _set_monthly_currency_formulas(
     sheet: Worksheet, closing_columns: list[int], exchange_rate_reference: str
 ) -> None:
-    """A havi forint- és euróösszegek összevonása az árfolyammal."""
+    """Set monthly currency formulas."""
     row_mapping = {
         58: 26,
         60: 28,
@@ -293,7 +293,7 @@ def _set_monthly_currency_formulas(
 
 
 def _set_monthly_purchase_formula(sheet: Worksheet, closing_columns: list[int]) -> None:
-    """A havi beszerzés képletének beállítása a levonásokkal."""
+    """Set monthly purchase formula."""
     purchases = _build_monthly_sum(closing_columns, 27)
     sheet["B59"] = f"={purchases}-(B61+B62+B63+B66+B67+B68)"
 
@@ -305,11 +305,11 @@ def _create_monthly_close(
     month: int,
     exchange_rate_reference: str,
 ) -> None:
-    """A havi záró fejléceinek és számított sorainak beállítása."""
+    """Create monthly close."""
     _copy_monthly_close(template_sheet=template_sheet, target_sheet=target_sheet)
-    target_sheet["B43"] = "Havi záró"
+    target_sheet["B43"] = "Monthly total"
     target_sheet["B44"] = MONTH_NAMES[month - 1]
-    target_sheet["B45"] = "Forint"
+    target_sheet["B45"] = "HUF"
     _set_monthly_basic_formulas(sheet=target_sheet, closing_columns=closing_columns)
     _set_monthly_currency_formulas(
         sheet=target_sheet,
@@ -326,7 +326,7 @@ def _create_month_sheet(
     month: int,
     exchange_rate_reference: str,
 ) -> Worksheet:
-    """Egy új havi munkalap létrehozása a heti és havi blokkokkal."""
+    """Create month sheet."""
     month_name = MONTH_NAMES[month - 1]
     sheet = workbook.create_sheet(title=month_name)
     closing_columns = _create_month_weeks(
@@ -346,8 +346,8 @@ def _create_month_sheet(
 
 
 def _create_summary_sheet(workbook: WorkbookType, template_sheet: Worksheet) -> None:
-    """Az összesítő létrehozása a havi záró sorfelirataival."""
-    sheet = workbook.create_sheet("Összesítő", index=0)
+    """Create summary sheet."""
+    sheet = workbook.create_sheet("Summary", index=0)
     copy_block(
         source_sheet=template_sheet,
         target_sheet=sheet,
@@ -361,10 +361,10 @@ def _create_summary_sheet(workbook: WorkbookType, template_sheet: Worksheet) -> 
 
 
 def _create_summary_month(workbook: WorkbookType, month: int) -> None:
-    """Egy havi összesítő oszlop létrehozása a havi záró hivatkozásaival."""
+    """Create summary month."""
     month_name = MONTH_NAMES[month - 1]
     month_sheet = workbook[month_name]
-    summary = workbook["Összesítő"]
+    summary = workbook["Summary"]
     target_column = month + 1
     copy_block(
         source_sheet=month_sheet,
@@ -391,9 +391,9 @@ def _create_summary_month(workbook: WorkbookType, month: int) -> None:
 
 
 def _create_exchange_rate_sheet(workbook: WorkbookType) -> None:
-    """A havi Euro-tábla létrehozása nulla árfolyamokkal."""
-    sheet = workbook.create_sheet("Euro")
-    sheet.append(["Hónap", "EUR/HUF árfolyam", "Árfolyam dátuma"])
+    """Create exchange rate sheet."""
+    sheet = workbook.create_sheet("Exchange_Rates")
+    sheet.append(["Month", "EUR/HUF rate", "Rate source date"])
     for month_name in MONTH_NAMES:
         sheet.append([month_name, 0, None])
     sheet.column_dimensions["A"].width = 18
@@ -405,25 +405,25 @@ def _create_exchange_rate_sheet(workbook: WorkbookType) -> None:
 
 
 def _create_daily_exchange_rates_sheet(workbook: WorkbookType) -> None:
-    """A napi árfolyamok rejtett, kezdetben üres nyilvántartása."""
+    """Create daily exchange rates sheet."""
     sheet = workbook.create_sheet(DAILY_EXCHANGE_RATES_SHEET)
-    sheet.append(["Alkalmazás dátuma", "Árfolyam dátuma", "EUR/HUF árfolyam"])
+    sheet.append(["Application date", "Rate source date", "EUR/HUF rate"])
     for column in ("A", "B", "C"):
         sheet.column_dimensions[column].width = 22
     sheet.sheet_state = "veryHidden"
 
 
 def _create_processed_documents_sheet(workbook: WorkbookType) -> None:
-    """A feldolgozott bizonylatok rejtett, kezdetben üres nyilvántartása."""
+    """Create processed documents sheet."""
     sheet = workbook.create_sheet(PROCESSED_DOCUMENTS_SHEET)
-    sheet.append(["Év", "Bizonylatszám"])
+    sheet.append(["Year", "Document number"])
     sheet.column_dimensions["A"].width = 12
     sheet.column_dimensions["B"].width = 30
     sheet.sheet_state = "veryHidden"
 
 
 def create_year_workbook(template_sheet: Worksheet, year: int) -> WorkbookType:
-    """Teljes éves riport létrehozása; a munkafüzetet mentés nélkül adja vissza."""
+    """Create all twelve monthly sheets, summary, rates and hidden registers."""
     workbook = Workbook()
     workbook.remove(workbook.active)
     _create_exchange_rate_sheet(workbook)
@@ -434,7 +434,7 @@ def create_year_workbook(template_sheet: Worksheet, year: int) -> WorkbookType:
             template_sheet=template_sheet,
             year=year,
             month=month,
-            exchange_rate_reference=f"'Euro'!$B${month + 1}",
+            exchange_rate_reference=f"'Exchange_Rates'!$B${month + 1}",
         )
         _create_summary_month(workbook, month)
     _create_daily_exchange_rates_sheet(workbook)
@@ -442,7 +442,7 @@ def create_year_workbook(template_sheet: Worksheet, year: int) -> WorkbookType:
     return workbook
 
 def create_partial_year_workbook(template_sheet: Worksheet, year: int, months: list[int]) -> WorkbookType:
-    """Részleges éves riport létrehozása; a munkafüzetet mentés nélkül adja vissza."""
+    """Create a reference workbook for selected months, keeping summary positions."""
     workbook = Workbook()
     workbook.remove(workbook.active)
     _create_exchange_rate_sheet(workbook)
@@ -453,7 +453,7 @@ def create_partial_year_workbook(template_sheet: Worksheet, year: int, months: l
             template_sheet=template_sheet,
             year=year,
             month=month,
-            exchange_rate_reference=f"'Euro'!$B${month + 1}",
+            exchange_rate_reference=f"'Exchange_Rates'!$B${month + 1}",
         )
         _create_summary_month(workbook, month)
     _create_daily_exchange_rates_sheet(workbook)

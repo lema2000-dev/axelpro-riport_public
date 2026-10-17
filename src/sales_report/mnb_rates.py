@@ -1,4 +1,4 @@
-"""Az aktuális EUR-árfolyam lekérése az MNB-től."""
+"""Retrieve the current EUR/HUF exchange rate from the Hungarian National Bank."""
 
 from datetime import date
 from decimal import Decimal
@@ -16,7 +16,7 @@ def _parse_current_rate(
     response: bytes,
     application_date: date,
 ) -> DailyExchangeRate:
-    """Az EUR-árfolyam és a forrásdátum kiolvasása a válaszból."""
+    """Parse current rate."""
     envelope = ET.fromstring(response)
 
     result = envelope.find(
@@ -41,7 +41,7 @@ def fetch_current_rate(
     *,
     today: date | None = None,
 ) -> DailyExchangeRate:
-    """Az aktuális EUR-árfolyam lekérése a megadott alkalmazási naphoz."""
+    """Retrieve the current MNB EUR/HUF rate for the given application date."""
     if today is None:
         today = date.today()
 

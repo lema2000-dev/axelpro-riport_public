@@ -4,7 +4,7 @@ __pycache__/
 *.py[cod]
 docs_private/
 
-# Valódi exportok, riportok és helyi alkalmazásállapot
+# Actual exports, reports, and local application status
 *.csv
 *.xlsx
 *.xlsm

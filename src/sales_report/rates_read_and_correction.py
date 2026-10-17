@@ -1,4 +1,4 @@
-"""Napi árfolyamok beolvasása, lekérése és a hiányzó napok pótlása."""
+"""Read stored rates, retrieve the current rate and resolve missing dates."""
 
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -17,16 +17,16 @@ from .models import DailyExchangeRate, Movement
 def _request_manual_exchange_rate(
     application_date: date,
 ) -> DailyExchangeRate:
-    """Árfolyam bekérése, hibás adat esetén újrakéréssel."""
+    """Request manual exchange rate."""
     while True:
         try:
             rate = Decimal(
                 input(
-                    f"EUR-árfolyam ({application_date:%Y-%m-%d}, Ft/EUR): "
+                    f"EUR exchange rate ({application_date:%Y-%m-%d}, HUF/EUR): "
                 ).strip().replace(",", ".")
             )
 
-            # Az árfolyamot a meglévő modell ellenőrzi.
+            # The shared model validates the exchange rate.
             DailyExchangeRate(
                 application_date=application_date,
                 source_date=application_date,
@@ -34,8 +34,8 @@ def _request_manual_exchange_rate(
             )
         except (InvalidOperation, ValueError, OverflowError):
             print(
-                "Pozitív, véges, Excelben tárolható számot adj meg "
-                "(például: 400 vagy 400,25)."
+                "Enter a positive, finite number that Excel can store "
+                "(for example: 400 or 400.25)."
             )
             continue
 
@@ -43,7 +43,7 @@ def _request_manual_exchange_rate(
 
     while True:
         text = input(
-            "Az árfolyam forrásdátuma (ÉÉÉÉ-HH-NN): "
+            "Exchange rate source date (YYYY-MM-DD): "
         ).strip()
 
         try:
@@ -53,8 +53,8 @@ def _request_manual_exchange_rate(
                 raise ValueError
         except ValueError:
             print(
-                "Érvényes dátumot adj meg ÉÉÉÉ-HH-NN formátumban "
-                "(például: 2026-10-12)."
+                "Enter a valid date in YYYY-MM-DD format "
+                "(for example: 2026-10-12)."
             )
             continue
 
@@ -70,7 +70,7 @@ def _find_missing_exchange_rate_dates(
     movements: list[Movement],
     exchange_rates: dict[date, DailyExchangeRate],
 ) -> list[date]:
-    """Az EUR-tételekhez hiányzó árfolyamnapok kigyűjtése."""
+    """Find missing exchange rate dates."""
     required_dates = {
         movement.movement_date
         for movement in movements
@@ -85,7 +85,7 @@ def _fill_missing_exchange_rates(
     *,
     request_rate: Callable[[date], DailyExchangeRate] | None = None,
 ) -> None:
-    """A hiányzó napok pótlása ismert vagy kézzel megadott árfolyammal."""
+    """Fill missing exchange rates."""
     if request_rate is None:
         request_rate = _request_manual_exchange_rate
 
@@ -117,7 +117,7 @@ def _get_current_exchange_rate(
         request_rate: Callable[[date], DailyExchangeRate] | None = None,
         show_message: Callable[[str], None] = print,
 ) -> DailyExchangeRate:
-    """Aktuális MNB-árfolyam lekérése, kézi beviteli lehetőséggel."""
+    """Get current exchange rate."""
     if request_rate is None:
         request_rate = _request_manual_exchange_rate
 
@@ -127,9 +127,9 @@ def _get_current_exchange_rate(
         return fetch_current_rate(today=today)
     except (OSError, HTTPException) as exc:
         show_message(
-            "Az MNB-árfolyam lekérése hálózati hiba miatt nem sikerült.\n"
-            f"Részletek: {exc}\n"
-            "Add meg kézzel az árfolyamot."
+            "Could not retrieve the MNB exchange rate because of a network error.\n"
+            f"Details: {exc}\n"
+            "Enter the exchange rate manually."
         )
 
         return request_rate(today)
@@ -137,7 +137,7 @@ def _get_current_exchange_rate(
 def _read_stored_exchange_rates(
     workbooks: dict[int, tuple[Workbook, Path]],
 ) -> dict[date, DailyExchangeRate]:
-    """Az érintett évek riportjaiban tárolt napi árfolyamok beolvasása."""
+    """Read stored exchange rates."""
     exchange_rates: dict[date, DailyExchangeRate] = {}
 
     for year in sorted(workbooks.keys()):
@@ -171,7 +171,7 @@ def get_exchange_rates(
     request_rate: Callable[[date], DailyExchangeRate] | None = None,
     show_message: Callable[[str], None] = print,
 ) -> dict[date, DailyExchangeRate]:
-    """Az importhoz szükséges napi árfolyamok összeállítása."""
+    """Combine stored and current rates, resolving required missing dates."""
     exchange_rates = _read_stored_exchange_rates(
         workbooks=workbooks,
     )

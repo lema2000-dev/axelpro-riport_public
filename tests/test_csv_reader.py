@@ -1,6 +1,6 @@
 from decimal import Decimal
 import pytest
-from axelpro_riport.csv_reader import read_movements
+from sales_report.csv_reader import read_movements
 
 
 def test_reads_utf16_tabs_negative_decimal_and_trims_fields(
@@ -11,7 +11,7 @@ def test_reads_utf16_tabs_negative_decimal_and_trims_fields(
             document=" SZ-1 ",
             amount="-12.50",
             currency=" eur ",
-            group=" Bontott alkatrész ",
+            group=" Used parts ",
         )
     ]
     result = read_movements(write_csv(tmp_path / "input.csv", rows))
@@ -19,14 +19,14 @@ def test_reads_utf16_tabs_negative_decimal_and_trims_fields(
     assert result[0].net_value == Decimal("-12.50")
     assert result[0].currency == "EUR"
     assert result[0].document_number == "SZ-1"
-    assert result[0].group == "Bontott alkatrész"
+    assert result[0].group == "Used parts"
     assert result[0].movement_date == rows[0].movement_date
 
 
 def test_inventory_is_ignored(tmp_path, write_csv, movement):
     path = write_csv(
         tmp_path / "input.csv",
-        [movement(transaction="LELTÁR", document=""), movement()],
+        [movement(transaction="INVENTORY", document=""), movement()],
     )
     assert read_movements(path) == [movement()]
 
@@ -44,16 +44,16 @@ def test_existing_validation_reports_invalid_row(
 
 def test_missing_columns_are_reported(tmp_path):
     path = tmp_path / "input.csv"
-    path.write_text("Bizonylatszám\nSZ-1\n", encoding="utf-16")
-    with pytest.raises(ValueError, match="Hiányzó CSV-oszlopok"):
+    path.write_text("Document number\nSZ-1\n", encoding="utf-16")
+    with pytest.raises(ValueError, match="Missing CSV columns"):
         read_movements(path)
 
 
-@pytest.mark.parametrize("expected", ["Új alkatrész", "Bontott alkatrész", "Munkadíj", "Szállítási költség", "Trailer", ""])
+@pytest.mark.parametrize("expected", ["New parts", "Used parts", "Labor", "Shipping", "Trailer", ""])
 def test_ungrouped_invoice_uses_user_decision(tmp_path, write_csv, movement, expected):
     from unittest.mock import Mock
     decide = Mock(return_value=expected)
-    path = write_csv(tmp_path / "input.csv", [movement(group="  ", document="DOC", item="ITEM", transaction="SZÁMLA")])
+    path = write_csv(tmp_path / "input.csv", [movement(group="  ", document="DOC", item="ITEM", transaction="INVOICE")])
     result = read_movements(path, request_missing_group=decide)
     decide.assert_called_once_with("DOC", "ITEM")
     assert len(result) == 1
@@ -62,14 +62,14 @@ def test_ungrouped_invoice_uses_user_decision(tmp_path, write_csv, movement, exp
     assert result[0].item_code == "ITEM"
 
 
-@pytest.mark.parametrize("transaction,group", [("Leltár", ""), ("Beszerzés", ""), ("Számla", "Új alkatrész")])
+@pytest.mark.parametrize("transaction,group", [("Inventory", ""), ("Purchase", ""), ("Invoice", "New parts")])
 def test_group_decision_only_for_ungrouped_invoices(tmp_path, write_csv, movement, transaction, group):
     from unittest.mock import Mock
     decide = Mock()
     path = write_csv(tmp_path / "input.csv", [movement(transaction=transaction, group=group)])
     result = read_movements(path, request_missing_group=decide)
     decide.assert_not_called()
-    assert len(result) == (0 if transaction == "Leltár" else 1)
+    assert len(result) == (0 if transaction == "Inventory" else 1)
 
 
 def test_ungrouped_invoice_without_callback_remains_unchanged(tmp_path, write_csv, movement):
@@ -79,15 +79,15 @@ def test_ungrouped_invoice_without_callback_remains_unchanged(tmp_path, write_cs
 
 
 @pytest.mark.parametrize("group,category", [
-    ("Új alkatrész", "new_parts"),
-    ("Bontott alkatrész", "used_parts"),
-    ("Munkadíj", "labor"),
-    ("Szállítási költség", "shipping"),
+    ("New parts", "new_parts"),
+    ("Used parts", "used_parts"),
+    ("Labor", "labor"),
+    ("Shipping", "shipping"),
     ("Trailer", "trailer"),
     ("", None),
 ])
 def test_selected_missing_group_is_used_by_processor(tmp_path, write_csv, movement, group, category):
-    from axelpro_riport.processor import process_movements
+    from sales_report.processor import process_movements
     from dataclasses import fields
     path = write_csv(tmp_path / "input.csv", [movement(group="", amount="123", item="PART")])
     rows = read_movements(path, request_missing_group=lambda document, item: group)
@@ -116,26 +116,26 @@ def test_selected_missing_group_is_used_by_processor(tmp_path, write_csv, moveme
 
 def test_group_callback_is_called_separately_for_each_ungrouped_invoice(tmp_path, write_csv, movement):
     from unittest.mock import Mock, call
-    decide = Mock(side_effect=["Munkadíj", "Bontott alkatrész"])
+    decide = Mock(side_effect=["Labor", "Used parts"])
     path = write_csv(tmp_path / "input.csv", [
         movement(group="", document="DOC", item="LABOR"),
         movement(group="", document="DOC", item="PART"),
     ])
     rows = read_movements(path, request_missing_group=decide)
     assert decide.call_args_list == [call("DOC", "LABOR"), call("DOC", "PART")]
-    assert [row.group for row in rows] == ["Munkadíj", "Bontott alkatrész"]
+    assert [row.group for row in rows] == ["Labor", "Used parts"]
 
 
 def test_user_group_choices_preserve_workshop_invoice_classification(tmp_path, write_csv, movement):
     from unittest.mock import Mock
-    from axelpro_riport.processor import process_movements
+    from sales_report.processor import process_movements
     path = write_csv(tmp_path / "input.csv", [
         movement(group="", document="DOC", item="LABOR", amount="100"),
         movement(group="", document="DOC", item="USED", amount="200"),
         movement(group="", document="DOC", item="NEW", amount="300"),
     ])
     rows = read_movements(path, request_missing_group=Mock(side_effect=[
-        "Munkadíj", "Bontott alkatrész", "Új alkatrész",
+        "Labor", "Used parts", "New parts",
     ]))
     result = process_movements(rows, set(), {}, set())
     daily = result.daily_totals[0]
@@ -154,31 +154,31 @@ def test_group_callback_cancellation_is_not_converted_to_csv_format_error(tmp_pa
 
 
 @pytest.mark.parametrize("partner", [
-    "TIMX Special Transport Kft.",
-    "ECO-Trans s.r.o.",
-    "  timx special transport kft.  ",
-    "  ECO-TRANS S.R.O.  ",
+    "Company 1",
+    "Company 2",
+    "  cOmPaNy 1  ",
+    "  cOmPaNy 2  ",
 ])
-@pytest.mark.parametrize("transaction", ["Számla", "Beszerzés", "Szállítólevél"])
+@pytest.mark.parametrize("transaction", ["Invoice", "Purchase", "Delivery note"])
 def test_excluded_partners_are_skipped_for_every_transaction_type(
     tmp_path, write_csv, movement, partner, transaction
 ):
     from unittest.mock import Mock
 
-    decide = Mock(side_effect=AssertionError("Kiszűrt partnerhez nem kérünk csoportot"))
+    decide = Mock(side_effect=AssertionError("Do not request a group for an excluded partner"))
     excluded = movement(document="EXCLUDED", transaction=transaction, group="")
     kept = movement(document="KEPT", amount="17")
     path = write_csv(
         tmp_path / "input.csv", [excluded, kept],
-        partners=[partner, "Másik partner"],
+        partners=[partner, "Other partner"],
     )
     assert read_movements(path, request_missing_group=decide) == [kept]
     decide.assert_not_called()
 
 
 @pytest.mark.parametrize("partner", [
-    "Másik partner", "", "TIMX Special Transport Kft. fióktelep",
-    "ECO-Trans s.r.o. másolat",
+    "Other partner", "", "Company 1 branch",
+    "Company 2 copy",
 ])
 def test_other_partners_are_not_excluded(tmp_path, write_csv, movement, partner):
     row = movement()
@@ -197,25 +197,25 @@ def test_partner_column_is_required(tmp_path, write_csv, movement):
         csv.writer(stream, delimiter="\t").writerows([
             row[:index] + row[index + 1:] for row in rows
         ])
-    with pytest.raises(ValueError, match="Hiányzó CSV-oszlopok: Partner"):
+    with pytest.raises(ValueError, match="Missing CSV columns: Partner"):
         read_movements(path)
 
 
 def test_excluded_partner_rows_do_not_reach_totals_or_document_register(
     tmp_path, write_csv, movement
 ):
-    from axelpro_riport.processor import process_movements
+    from sales_report.processor import process_movements
 
     rows = [
-        movement(document="BLOCKED-INVOICE", amount="900", item="SANY"),
-        movement(document="BLOCKED-BUY", transaction="Beszerzés", amount="800"),
+        movement(document="BLOCKED-INVOICE", amount="900", item="CONSUMABLES"),
+        movement(document="BLOCKED-BUY", transaction="Purchase", amount="800"),
         movement(document="KEPT", amount="100"),
     ]
     path = write_csv(tmp_path / "input.csv", rows, partners=[
-        "TIMX Special Transport Kft.", "ECO-Trans s.r.o.", "Tesztpartner",
+        "Company 1", "Company 2", "Example customer",
     ])
     result = process_movements(read_movements(path), set(), {}, set())
     assert result.new_documents == {(2026, "KEPT")}
     assert result.daily_totals[0].new_parts == 100
     assert result.daily_totals[0].purchases == 0
-    assert result.monthly_totals[0].sany == 0
+    assert result.monthly_totals[0].consumables == 0

@@ -5,7 +5,7 @@ from xml.sax.saxutils import escape
 from xml.etree import ElementTree as ET
 from urllib.error import URLError
 import pytest
-from axelpro_riport import mnb_rates
+from sales_report import mnb_rates
 
 
 def test_fetch_extracts_eur_not_first_currency_and_keeps_source_date(monkeypatch):

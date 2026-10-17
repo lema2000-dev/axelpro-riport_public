@@ -27,7 +27,7 @@ from .excel_constants import (
 def _read_processed_documents(
     workbooks: dict[int, tuple[Workbook, Path]],
 ) -> set[tuple[int, str]]:
-    """Az érintett évek már importált bizonylatainak kigyűjtése."""
+    """Read processed documents."""
     processed_documents: set[tuple[int, str]] = set()
 
     for year in sorted(workbooks.keys()):
@@ -48,7 +48,7 @@ def _read_processed_documents(
 def _get_processor_exchange_rates(
     exchange_rates: dict[date, DailyExchangeRate],
 ) -> dict[date, Decimal]:
-    """Az árfolyamrekordokból a processor számára árfolyamszótár készítése."""
+    """Get processor exchange rates."""
     return {
         day: record.rate
         for day, record in exchange_rates.items()
@@ -60,11 +60,11 @@ def _confirm_import_preview(
     movements: list[Movement],
     import_result: ImportResult,
 ) -> bool:
-    """Az adott év importelőnézetének megjelenítése és jóváhagyása."""
-    print(f"\n=== {year}. évi import előnézete ===")
-    print(f"Célfájl: {path}")
+    """Display the yearly preview and request approval before saving."""
+    print(f"\n=== {year} import preview ===")
+    print(f"Target file: {path}")
 
-    print("\nHozzáadandó napi összegek (Ft):")
+    print("\nDaily amounts to add (HUF):")
 
     for totals in sorted(
         import_result.daily_totals,
@@ -78,7 +78,7 @@ def _confirm_import_preview(
         for field_name in DAILY_TARGET_ROWS:
             print(f"  {field_name}: {getattr(totals, field_name):,}")
 
-    print("\nHozzáadandó havi összegek (Ft):")
+    print("\nMonthly amounts to add (HUF):")
 
     for totals in sorted(
         import_result.monthly_totals,
@@ -105,8 +105,8 @@ def _confirm_import_preview(
         and movement.document_key not in import_result.new_documents
     ]
 
-    print(f"\nÚj bizonylatok száma: {len(new_documents)}")
-    print(f"Már feldolgozott, kihagyott tételek száma: {len(skipped_movements)}")
+    print(f"\nNew documents: {len(new_documents)}")
+    print(f"Previously processed items skipped: {len(skipped_movements)}")
 
     for movement in skipped_movements:
         print(
@@ -116,14 +116,14 @@ def _confirm_import_preview(
             f"{movement.net_value} {movement.currency}"
         )
 
-    answer = input("\nElfogadod és mented ezt az évet? (i/n): ")
-    return answer.strip().lower() == "i"
+    answer = input("\nAccept and save this year? (y/n): ")
+    return answer.strip().lower() == "y"
 
 def _loads_workbooks(
     movements: list[Movement],
     directory: str | Path,
 ) -> dict[int, tuple[Workbook, Path]]:
-    """Az érintett évek munkafüzeteinek betöltése vagy létrehozása."""
+    """Load each affected annual report once, sharing a single temporary template."""
     years = {movement.movement_date.year for movement in movements}
     workbooks: dict[int, tuple[Workbook, Path]] = {}
     template_workbook = create_template_workbook()
@@ -135,14 +135,14 @@ def _loads_workbooks(
                 directory=directory,
                 year=year,
                 months=months,
-                template_sheet=template_workbook["Szeptember"],
+                template_sheet=template_workbook["September"],
             )
             workbooks[year] = (workbook, path)
 
         return workbooks
 
     except Exception:
-        # Ha a betöltés félbeszakad, a korábban betöltötteket bezárjuk.
+        # Close previously loaded workbooks if loading is interrupted.
         for workbook, _ in workbooks.values():
             workbook.close()
 
@@ -162,7 +162,7 @@ def import_csv(
     check_cancelled: Callable[[], None] | None = None,
     request_missing_group: Callable[[str, str], str] | None = None,
 ) -> None:
-    """CSV importálása az érintett éves riportokba."""
+    """Import CSV movements and save each affected year only after approval."""
     if confirm_preview is None:
         confirm_preview = _confirm_import_preview
 
@@ -207,7 +207,7 @@ def import_csv(
         )
 
         if import_result is None:
-            show_message("Nincs új tétel az importáláshoz.")
+            show_message("There are no new items to import.")
             return
 
         saved_years: list[int] = []
@@ -248,14 +248,14 @@ def import_csv(
                 saved_description = (
                     ", ".join(str(value) for value in saved_years)
                     if saved_years
-                    else "nincs"
+                    else "none"
                 )
 
                 raise WorkbookSaveError(
                     f"{exc}\n"
-                    f"Sikertelen mentés éve: {year}\n"
-                    f"Már sikeresen elmentett évek: {saved_description}\n"
-                    "Az import további éveinek feldolgozása leállt."
+                    f"Year that could not be saved: {year}\n"
+                    f"Years already saved successfully: {saved_description}\n"
+                    "Processing of further years has stopped."
                 ) from exc
 
             saved_years.append(year)

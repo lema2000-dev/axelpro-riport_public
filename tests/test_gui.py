@@ -1,4 +1,4 @@
-"""A felületi vezérlés és a háttérszál kapcsolata, valódi ablak nélkül."""
+"""Test gui."""
 from concurrent.futures import Future
 from datetime import date
 from decimal import Decimal
@@ -8,8 +8,8 @@ from threading import Thread, get_ident
 from types import SimpleNamespace
 from unittest.mock import Mock
 import pytest
-from axelpro_riport import gui
-from axelpro_riport.models import DailyExchangeRate, ImportResult
+from sales_report import gui
+from sales_report.models import DailyExchangeRate, ImportResult
 
 
 @pytest.fixture
@@ -103,7 +103,7 @@ def test_finish_success_and_warnings(app):
 
 def test_finish_cancel_does_not_report_success(app):
     app._finish_import(None, True, [])
-    assert gui.messagebox.showinfo.call_args.kwargs['title'] == 'Importálás megszakítva'
+    assert gui.messagebox.showinfo.call_args.kwargs['title'] == 'Import cancelled'
     app.root.after.assert_not_called()
 
 
@@ -204,12 +204,12 @@ def test_worker_callback_names_match_keyword_import_contract(app, monkeypatch):
     app._request_rate = Mock(return_value=record)
     app._show_message = Mock()
     app._confirm_preview = Mock(return_value=True)
-    app._request_missing_group = Mock(return_value="Bontott alkatrész")
+    app._request_missing_group = Mock(return_value="Used parts")
     app._call_ui = lambda function, *args: function(*args)
     result = ImportResult([], [], set())
     def run(**kwargs):
         assert kwargs['request_rate'](day) == record
-        assert kwargs['request_missing_group']('DOC', 'ITEM') == 'Bontott alkatrész'
+        assert kwargs['request_missing_group']('DOC', 'ITEM') == 'Used parts'
         kwargs['show_message']('message')
         assert kwargs['confirm_preview'](year=2026, path=Path('report.xlsx'), movements=[], import_result=result)
         kwargs['check_cancelled']()
@@ -290,19 +290,19 @@ def test_csv_picker_retries_os_error_then_can_cancel(app, monkeypatch):
 
 
 def test_group_save_failure_can_retry_or_cancel(app):
-    app._request_groups = Mock(side_effect=[['Szűrők'], None])
+    app._request_groups = Mock(side_effect=[['Filters'], None])
     save = Mock(side_effect=gui.SettingsSaveError('denied'))
     app._change_groups(title='Groups', button_text='Save', save_groups=save)
-    save.assert_called_once_with(['Szűrők'])
+    save.assert_called_once_with(['Filters'])
     assert app._request_groups.call_count == 2
     gui.messagebox.showerror.assert_called_once()
 
 
 def test_settings_display_includes_directory_and_groups(app, monkeypatch):
-    monkeypatch.setattr(gui, 'load_settings', lambda: SimpleNamespace(output_directory='/reports', additional_new_part_groups=['Szűrők']))
+    monkeypatch.setattr(gui, 'load_settings', lambda: SimpleNamespace(output_directory='/reports', additional_new_part_groups=['Filters']))
     app._show_settings()
     text = gui.messagebox.showinfo.call_args.kwargs['message']
-    assert '/reports' in text and 'Szűrők' in text
+    assert '/reports' in text and 'Filters' in text
 
 
 def test_first_start_empty_groups_are_saved(app, monkeypatch, tmp_path):
@@ -327,7 +327,7 @@ def test_existing_settings_skip_initial_dialogs(app, monkeypatch, tmp_path):
     app._request_groups.assert_not_called()
 
 
-@pytest.mark.parametrize("group", ["Új alkatrész", "Bontott alkatrész", "Munkadíj", "Szállítási költség", "Trailer", ""])
+@pytest.mark.parametrize("group", ["New parts", "Used parts", "Labor", "Shipping", "Trailer", ""])
 def test_worker_group_choice_goes_through_ui_bridge(app, monkeypatch, group):
     app._request_missing_group = Mock(return_value=group)
     app._call_ui = Mock(side_effect=lambda function, *args: function(*args))
@@ -352,7 +352,7 @@ def test_group_dialog_cancellation_reaches_import_completion(app, monkeypatch):
     finish(*args)
     gui.messagebox.showerror.assert_not_called()
     gui.messagebox.showwarning.assert_not_called()
-    assert "megszakítva" in gui.messagebox.showinfo.call_args.kwargs["title"].casefold()
+    assert "cancelled" in gui.messagebox.showinfo.call_args.kwargs["title"].casefold()
     app.import_button.configure.assert_called_once_with(state="normal")
 
 
@@ -368,7 +368,7 @@ def test_worker_first_warning_can_be_displayed_after_import(app, monkeypatch):
     assert args == (None, False, ["FIRST"])
     finish(*args)
     gui.messagebox.showwarning.assert_called_once_with(
-        title="Munkafüzet-figyelmeztetések", message="FIRST", parent=app.root,
+        title="Workbook warnings", message="FIRST", parent=app.root,
     )
 
 

@@ -1,4 +1,4 @@
-"""Az alkalmazás grafikus felülete."""
+"""Tkinter interface with background imports and interactive approval dialogs."""
 
 import warnings
 import tkinter as tk
@@ -34,14 +34,14 @@ from .settings import (
 from .csv_reader import CsvFileAccessError, CsvFormatError
 
 class _ImportCancelled(Exception):
-    """Az alkalmazás bezárása miatt megszakított importálás."""
+    """Import cancelled."""
 
 class _Application:
-    """A főablak és a hozzá tartozó felületi állapot."""
+    """Application."""
 
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        self.root.title("AxelPro Riport")
+        self.root.title("Sales Report")
         self.root.geometry("420x750")
         self.root.minsize(360,550)
 
@@ -66,10 +66,10 @@ class _Application:
         self.root.after(0, self._initialize)
 
     def _build_menu(self) -> None:
-        """A főmenü gombjainak létrehozása."""
+        """Build menu."""
         ttk.Label(
             self.main_frame,
-            text="AxelPro Riport",
+            text="Sales Report",
             font=("", 16, "bold"),
         ).pack(pady=(0, 15))
 
@@ -104,26 +104,26 @@ class _Application:
             lambda event: canvas.itemconfig(window_id, width=event.width)
         )
 
-        # Kattintásra fókuszba hozzuk a Canvas-t
+        # Focus the canvas on click.
         canvas.bind("<Button-1>", lambda event: canvas.focus_set())
-        # Gombok közötti üres térre kattintva is fókuszba hozzuk a Canvas-t
+        # Focus the canvas when clicking between buttons.
         buttons_frame.bind("<Button-1>", lambda event: canvas.focus_set())
-        # A canvason kívülre kattintva is fókuszba hozzuk a Canvas-t
+        # Focus the canvas when clicking outside it.
         self.root.bind("<Button-1>", lambda event: canvas.focus_set())
         self.main_frame.bind("<Button-1>", lambda event: canvas.focus_set())
         menu_frame.bind("<Button-1>", lambda event: canvas.focus_set())
-        # Billentyűzetes görgetés a Canvas-ra fókuszálva
+        # Keyboard scrolling while the canvas has focus.
         canvas.bind("<Up>", lambda event: canvas.yview_scroll(-1, "units"))
         canvas.bind("<Down>", lambda event: canvas.yview_scroll(1, "units"))
 
         buttons = [
-            ("Importálás", self._start_import),
-            ("Újalkatrész-\ncsoport\nhozzáadása", self._add_groups),
-            ("Újalkatrész-\ncsoport\neltávolítása", self._remove_groups),
-            ("Riportmappa\nmódosítása", self._change_directory),
-            ("Jelenlegi\nbeállítások\nmegtekintése", self._show_settings),
-            ("Kilépés", self._exit),
-            ("Alaphelyzetbe\nállítás és\nbezárás", self._reset_and_exit),
+            ("Import", self._start_import),
+            ("Add new-part\ncategories", self._add_groups),
+            ("Remove new-part\ncategories", self._remove_groups),
+            ("Change report\nfolder", self._change_directory),
+            ("View current\nsettings", self._show_settings),
+            ("Exit", self._exit),
+            ("Reset and\nclose", self._reset_and_exit),
         ]
 
         for index, (text, command) in enumerate(buttons):
@@ -156,11 +156,11 @@ class _Application:
             *,
             first_open: bool = False,
         ) -> str | None:
-            """Riportmappa kiválasztása tallózással."""
+            """Request directory."""
             selected_directory: str | None = None
     
             window = tk.Toplevel(self.root)
-            window.title("Riportmappa kiválasztása")
+            window.title("Select report folder")
             window.resizable(False, False)
             window.transient(self.root)
     
@@ -169,7 +169,7 @@ class _Application:
     
             ttk.Label(
                 frame,
-                text="Válaszd ki a riportok mentési mappáját.",
+                text="Select the folder for report files.",
             ).pack(pady=(0, 15))
     
             def browse() -> None:
@@ -178,7 +178,7 @@ class _Application:
                 try:
                     directory = filedialog.askdirectory(
                         parent=window,
-                        title="Riportmappa kiválasztása",
+                        title="Select report folder",
                         mustexist=True,
                     )
     
@@ -189,14 +189,14 @@ class _Application:
     
                     if not path.is_dir():
                         raise ValueError(
-                            "A kiválasztott mappa már nem érhető el."
+                            "The selected folder is no longer available."
                         )
     
                     selected_directory = str(path.resolve())
     
                 except (OSError, RuntimeError, ValueError) as exc:
                     messagebox.showerror(
-                        title="Mappaválasztási hiba",
+                        title="Folder selection error",
                         message=str(exc),
                         parent=window,
                     )
@@ -206,7 +206,7 @@ class _Application:
     
             ttk.Button(
                 frame,
-                text="Tallózás",
+                text="Browse",
                 command=browse,
             ).pack(fill="x")
     
@@ -215,7 +215,7 @@ class _Application:
             else:
                 ttk.Button(
                     frame,
-                    text="Megszakítás",
+                    text="Cancel",
                     command=window.destroy,
                 ).pack(fill="x", pady=(10, 0))
     
@@ -232,7 +232,7 @@ class _Application:
             button_text: str,
             first_open: bool = False,
         ) -> list[str] | None:
-            """Újalkatrész-csoportok megadása."""
+            """Request groups."""
             selected_groups: list[str] | None = None
     
             window = tk.Toplevel(self.root)
@@ -245,7 +245,7 @@ class _Application:
     
             ttk.Label(
                 frame,
-                text="Csoportnevek pontosvesszővel elválasztva:",
+                text="Category names separated by semicolons:",
             ).pack(anchor="w", pady=(0, 5))
     
             entry = ttk.Entry(frame, width=45)
@@ -264,18 +264,18 @@ class _Application:
                 groups = [group.strip() for group in value.split(";")]
     
                 if not value:
-                    error = "Adj meg legalább egy csoportnevet."
+                    error = "Enter at least one category name."
                 elif any(not group for group in groups):
-                    error = "Az elválasztók között nem lehet üres csoportnév."
+                    error = "Category names between separators must not be empty."
                 elif len(groups) != len({group.casefold() for group in groups}):
-                    error = "Egy csoportnevet csak egyszer adj meg."
+                    error = "Enter each category name only once."
                 else:
                     selected_groups = groups
                     window.destroy()
                     return
     
                 messagebox.showerror(
-                    title="Hibás csoportlista",
+                    title="Invalid category list",
                     message=error,
                     parent=window,
                 )
@@ -294,7 +294,7 @@ class _Application:
             else:
                 ttk.Button(
                     frame,
-                    text="Megszakítás",
+                    text="Cancel",
                     command=window.destroy,
                 ).pack(fill="x", pady=(10, 0))
     
@@ -312,7 +312,7 @@ class _Application:
         button_text: str,
         save_groups: Callable[[list[str]], None],
     ) -> None:
-        """Csoportok bekérése és hozzáadása vagy eltávolítása."""
+        """Change groups."""
         while True:
             groups = self._request_groups(
                 title=title,
@@ -333,7 +333,7 @@ class _Application:
                 SettingsSaveError,
             ) as exc:
                 messagebox.showerror(
-                    title="Beállítási hiba",
+                    title="Settings error",
                     message=str(exc),
                     parent=self.root,
                 )
@@ -342,15 +342,15 @@ class _Application:
             return
 
     def _ensure_settings(self) -> None:
-        """Első indításkor a beállítások bekérése és mentése."""
+        """Ensure settings."""
         while not self._closing:
             try:
                 settings_exists = settings_path().exists()
             except OSError as exc:
                 messagebox.showerror(
-                    title="Beállítási hiba",
-                    message="A beállításfájl elérhetősége nem ellenőrizhető.\n"
-                    f"Részletek: {exc}",
+                    title="Settings error",
+                    message="Cannot check settings file availability.\n"
+                    f"Details: {exc}",
                     parent=self.root,
                 )
                 continue
@@ -369,8 +369,8 @@ class _Application:
             return
 
         groups = self._request_groups(
-            title="Újalkatrész-csoportok",
-            button_text="Kész",
+            title="New-part categories",
+            button_text="Done",
             first_open=True,
         )
 
@@ -385,7 +385,7 @@ class _Application:
                 )
             except SettingsSaveError as exc:
                 messagebox.showerror(
-                    title="Mentési hiba",
+                    title="Save error",
                     message=str(exc),
                     parent=self.root,
                 )
@@ -394,30 +394,30 @@ class _Application:
             return
 
     def _initialize(self) -> None:
-        """Beállítások biztosítása, majd a főmenü megnyitása."""
+        """Initialize."""
         self._ensure_settings()
 
         if not self._closing:
             self._build_menu()
 
     def _add_groups(self) -> None:
-        """További újalkatrész-csoportok hozzáadása."""
+        """Add groups."""
         self._change_groups(
-            title="Újalkatrész-csoportok hozzáadása",
-            button_text="Hozzáadás",
+            title="Add new-part categories",
+            button_text="Add",
             save_groups=add_new_part_groups,
         )
 
     def _remove_groups(self) -> None:
-        """Újalkatrész-csoportok eltávolítása."""
+        """Remove groups."""
         self._change_groups(
-            title="Újalkatrész-csoportok eltávolítása",
-            button_text="Eltávolítás",
+            title="Remove new-part categories",
+            button_text="Remove",
             save_groups=remove_new_part_groups,
         )
 
     def _change_directory(self) -> None:
-        """A riportmappa módosítása."""
+        """Change directory."""
         while True:
             directory = self._request_directory()
 
@@ -435,7 +435,7 @@ class _Application:
                 SettingsSaveError,
             ) as exc:
                 messagebox.showerror(
-                    title="Beállítási hiba",
+                    title="Settings error",
                     message=str(exc),
                     parent=self.root,
                 )
@@ -444,7 +444,7 @@ class _Application:
             return
 
     def _show_settings(self) -> None:
-            """A tárolt riportmappa és csoportnevek megjelenítése."""
+            """Show settings."""
             try:
                 settings = load_settings()
             except (
@@ -455,7 +455,7 @@ class _Application:
                 SettingsFileAccessError,
             ) as exc:
                 messagebox.showerror(
-                    title="Beállítási hiba",
+                    title="Settings error",
                     message=str(exc),
                     parent=self.root,
                 )
@@ -467,16 +467,16 @@ class _Application:
             ) 
     
             if not groups_text:
-                groups_text = "Nincsenek megadva újalkatrész-csoportok."
+                groups_text = "No new-part categories have been configured."
     
             messagebox.showinfo(
-                title="Jelenlegi beállítások",
-                message=f"Riportmappa:\n{settings.output_directory}\n\n"
-                f"További újalkatrész-csoportok:\n{groups_text}"
+                title="Current settings",
+                message=f"Report folder:\n{settings.output_directory}\n\n"
+                f"Additional new-part categories:\n{groups_text}"
             , parent=self.root)
     
     def _exit(self) -> None:
-            """Megszakítás jelzése, majd biztonságos kilépés."""
+            """Exit."""
             if self._closing:
                 return
     
@@ -490,7 +490,7 @@ class _Application:
             self._wait_for_import_exit()
 
     def _wait_for_import_exit(self) -> None:
-        """A háttérszál befejezésének megvárása a főszál blokkolása nélkül."""
+        """Wait for import exit."""
         if self._import_thread is not None and self._import_thread.is_alive():
             self.root.after(100, self._wait_for_import_exit)
             return
@@ -498,14 +498,14 @@ class _Application:
         self.root.destroy()
         
     def _reset_and_exit(self) -> None:
-        """A beállítások törlése megerősítés után, majd kilépés."""
+        """Reset and exit."""
         confirmed = messagebox.askyesno(
-            title="Alaphelyzetbe állítás és bezárás",
+            title="Reset and close",
             message=(
-                "Figyelem! Ez törli a mentett riportmappa-útvonalat "
-                "és a felvett alkatrészcsoportokat.\n"
-                "Az Excel-riportok megmaradnak.\n\n"
-                "Biztosan alaphelyzetbe szeretnéd állítani a programot?"
+                "Warning! This deletes the saved report folder path "
+                "and the configured part categories.\n"
+                "Existing Excel reports will be kept.\n\n"
+                "Are you sure you want to reset the application?"
             ),
             parent=self.root,
         )
@@ -517,7 +517,7 @@ class _Application:
             reset()
         except SettingsResetError as exc:
             messagebox.showerror(
-                title="Sikertelen alaphelyzetbe állítás",
+                title="Reset failed",
                 message=str(exc),
                 parent=self.root,
             )
@@ -526,15 +526,15 @@ class _Application:
         self._exit()
 
     def _request_csv_path(self) -> Path | None:
-        """CSV fájl kiválasztása tallózással."""
+        """Request csv path."""
         while True:
             try:
                 filename = filedialog.askopenfilename(
                     parent=self.root,
-                    title="Importálandó CSV kiválasztása",
+                    title="Select CSV to import",
                     filetypes=[
-                        ("CSV fájlok", "*.csv"),
-                        ("Minden fájl", "*"),
+                        ("CSV files", "*.csv"),
+                        ("All files", "*"),
                     ],
                 )
 
@@ -544,21 +544,21 @@ class _Application:
                 path = Path(filename)
 
                 if path.suffix.lower() != ".csv":
-                    raise ValueError("CSV-fájlt válassz ki.")
+                    raise ValueError("Select a CSV file.")
 
                 if not path.is_file():
-                    raise ValueError("A kiválasztott fájl már nem érhető el.")
+                    raise ValueError("The selected file is no longer available.")
 
                 return path.resolve()
             except (OSError, RuntimeError, ValueError) as exc:
                 messagebox.showerror(
-                    title="CSV-kiválasztási hiba",
+                    title="CSV selection error",
                     message=str(exc),
                     parent=self.root,
                 )
 
     def _start_import(self) -> None:
-        """CSV kiválasztása és az import háttérszálának indítása."""
+        """Start import."""
         if self._closing or self._import_running:
             return
 
@@ -582,8 +582,8 @@ class _Application:
             self._import_running = False
             self.import_button.configure(state="normal")
             messagebox.showerror(
-                title="Importálási hiba",
-                message=f"Az importálás nem indítható el.\nRészletek: {exc}",
+                title="Import error",
+                message=f"Could not start the import.\nDetails: {exc}",
                 parent=self.root,
             )
 
@@ -591,11 +591,11 @@ class _Application:
         self,
         application_date: date,
     ) -> DailyExchangeRate:
-        """Napi árfolyam bekérése és ellenőrzése."""
+        """Request rate."""
         selected_rate: DailyExchangeRate | None = None
 
         window = tk.Toplevel(self.root)
-        window.title("Kézi árfolyam bevitele")
+        window.title("Enter exchange rate manually")
         window.resizable(False, False)
         window.transient(self.root)
 
@@ -604,12 +604,12 @@ class _Application:
 
         ttk.Label(
             frame,
-            text=f"Alkalmazás napja: {application_date:%Y-%m-%d}",
+            text=f"Application date: {application_date:%Y-%m-%d}",
         ).pack(anchor="w", pady=(0, 15))
 
         ttk.Label(
             frame,
-            text="EUR-árfolyam (Ft/EUR):",
+            text="EUR exchange rate (HUF/EUR):",
         ).pack(anchor="w")
 
         rate_entry = ttk.Entry(frame, width=35)
@@ -617,7 +617,7 @@ class _Application:
 
         ttk.Label(
             frame,
-            text="Forrásdátum (ÉÉÉÉ-HH-NN):",
+            text="Source date (YYYY-MM-DD):",
         ).pack(anchor="w")
 
         date_entry = ttk.Entry(frame, width=35)
@@ -625,7 +625,7 @@ class _Application:
 
         def show_input_error(message: str, entry: ttk.Entry) -> None:
             messagebox.showerror(
-                title="Hibás árfolyamadat",
+                title="Invalid exchange rate",
                 message=message,
                 parent=window,
             )
@@ -646,8 +646,8 @@ class _Application:
 
             except (InvalidOperation, ValueError, OverflowError):
                 show_input_error(
-                    "Pozitív, véges, Excelben tárolható számot adj meg "
-                    "(például: 400 vagy 400,25).",
+                    "Enter a positive, finite number that Excel can store "
+                    "(for example: 400 or 400.25).",
                     rate_entry,
                 )
                 return
@@ -660,8 +660,8 @@ class _Application:
                     raise ValueError()
             except ValueError:
                 show_input_error(
-                    "Érvényes dátumot adj meg ÉÉÉÉ-HH-NN formátumban "
-                    "(például: 2026-10-12).",
+                    "Enter a valid date in YYYY-MM-DD format "
+                    "(for example: 2026-10-12).",
                     date_entry,
                 )
                 return
@@ -675,7 +675,7 @@ class _Application:
 
         ttk.Button(
             frame,
-            text="Kész",
+            text="Done",
             command=submit,
         ).pack(fill="x")
 
@@ -690,9 +690,9 @@ class _Application:
         return selected_rate
 
     def _show_message(self, message: str) -> None:
-        """Import közbeni tájékoztató üzenet megjelenítése."""
+        """Show message."""
         messagebox.showinfo(
-            title="Importálás",
+            title="Import",
             message=message,
             parent=self.root,
         )
@@ -704,11 +704,11 @@ class _Application:
         movements: list[Movement],
         import_result: ImportResult,
     ) -> bool:
-        """Az adott év importelőnézete és mentésének jóváhagyása."""
+        """Confirm preview."""
         accepted = False
 
         window = tk.Toplevel(self.root)
-        window.title(f"{year}. évi import előnézete")
+        window.title(f"{year} import preview")
         window.geometry("850x600")
         window.transient(self.root)
 
@@ -717,7 +717,7 @@ class _Application:
 
         ttk.Label(
             frame,
-            text=f"Célfájl: {path}",
+            text=f"Target file: {path}",
             wraplength=780,
         ).pack(anchor="w", pady=(0, 10))
 
@@ -730,9 +730,9 @@ class _Application:
             show="headings",
         )
 
-        table.heading("period", text="Nap / hónap")
-        table.heading("category", text="Megnevezés")
-        table.heading("amount", text="Hozzáadandó összeg (Ft)")
+        table.heading("period", text="Day / month")
+        table.heading("category", text="Description")
+        table.heading("amount", text="Amount to add (HUF)")
 
         table.column("period", width=130, anchor="w")
         table.column("category", width=380, anchor="w")
@@ -749,20 +749,20 @@ class _Application:
         table.pack(side="left", fill="both", expand=True)
 
         daily_labels = {
-            "used_parts": "Bontott alkatrész",
-            "new_parts": "Új alkatrész",
-            "labor": "Munkadíj",
-            "workshop_used_parts": "Bontott alkatrész – műhely",
-            "workshop_new_parts": "Új alkatrész – műhely",
-            "purchases": "Beszerzés",
-            "shipping": "Szállítási költség",
+            "used_parts": "Used parts",
+            "new_parts": "New parts",
+            "labor": "Labor",
+            "workshop_used_parts": "Workshop used parts",
+            "workshop_new_parts": "Workshop new parts",
+            "purchases": "Purchase",
+            "shipping": "Shipping",
             "trailer": "Trailer",
         }
 
         monthly_labels = {
-            "sany": "Segédanyag",
-            "diag": "Diagnosztika",
-            "kj": "Klímajavítás",
+            "consumables": "Consumables",
+            "diagnostics": "Diagnostics",
+            "air_conditioning": "Air conditioning repair",
         }
 
         for totals in sorted(
@@ -821,8 +821,8 @@ class _Application:
         ttk.Label(
             frame,
             text=(
-                f"Új bizonylatok: {len(new_documents)}    "
-                f"Kihagyott tételek: {len(skipped_movements)}"
+                f"New documents: {len(new_documents)}    "
+                f"Skipped items: {len(skipped_movements)}"
             ),
         ).pack(anchor="w", pady=(10, 0))
 
@@ -833,7 +833,7 @@ class _Application:
                 values=(
                     movement.movement_date.isoformat(),
                     (
-                        f"Kihagyva: {movement.document_number} / "
+                        f"Skipped: {movement.document_number} / "
                         f"{movement.item_code}"
                     ),
                     f"{movement.net_value} {movement.currency}",
@@ -850,13 +850,13 @@ class _Application:
 
         ttk.Button(
             buttons,
-            text="Elutasítás",
+            text="Reject",
             command=window.destroy,
         ).pack(side="left")
 
         ttk.Button(
             buttons,
-            text="Elfogadás",
+            text="Accept",
             command=accept,
         ).pack(side="right")
 
@@ -870,7 +870,7 @@ class _Application:
         return accepted
 
     def _check_cancelled(self) -> None:
-        """Az import megszakítása ha elkezdődött a bezárás."""
+        """Check cancelled."""
         if self._closing:
             raise _ImportCancelled()
 
@@ -879,12 +879,12 @@ class _Application:
         document_number: str,
         item_code: str,
     ) -> str:
-        """Csoport kiválasztása egy csoport nélküli számlatételhez."""
+        """Ask the user to classify an invoice item with an empty group."""
         self._check_cancelled()
         selected_group: str | None = None
 
         window = tk.Toplevel(self.root)
-        window.title("Hiányzó alkatrész csoport")
+        window.title("Missing item group")
         window.transient(self.root)
         window.resizable(False, False)
 
@@ -894,10 +894,10 @@ class _Application:
         ttk.Label(
             frame,
             text=(
-                "Ennek a számlatételnek nincs csoportja.\n\n"
-                f"Bizonylatszám: {document_number}\n"
-                f"Cikkszám: {item_code}\n\n"
-                "Válaszd ki a tétel csoportját:"
+                "This invoice item has no group.\n\n"
+                f"Document number: {document_number}\n"
+                f"Item code: {item_code}\n\n"
+                "Select the item group:"
             ),
             wraplength=400,
             justify="left",
@@ -909,12 +909,12 @@ class _Application:
             window.destroy()
 
         choices = (
-            ("Új alkatrész", "Új alkatrész"),
-            ("Bontott alkatrész", "Bontott alkatrész"),
-            ("Munkadíj", "Munkadíj"),
-            ("Szállítási költség", "Szállítási költség"),
+            ("New parts", "New parts"),
+            ("Used parts", "Used parts"),
+            ("Labor", "Labor"),
+            ("Shipping", "Shipping"),
             ("Trailer", "Trailer"),
-            ("Egyik sem", ""),
+            ("None of these", ""),
         )
 
         for label, group in choices:
@@ -936,7 +936,7 @@ class _Application:
         return selected_group
 
     def _import_worker(self, csv_path: Path) -> None:
-        """Az import végrehajtása a háttérszálon."""
+        """Import worker."""
         error: Exception | None = None
         cancelled = False
         warning_messages: list[str] = []
@@ -1002,7 +1002,7 @@ class _Application:
         cancelled: bool,
         warning_messages: list[str],
     ) -> None:
-        """Az import eredményének megjelenítése a főszálon."""
+        """Finish import."""
         self._import_running = False
 
         if self._closing:
@@ -1012,7 +1012,7 @@ class _Application:
 
         if error is not None:
             messagebox.showerror(
-                title="Importálási hiba",
+                title="Import error",
                 message=str(error),
                 parent=self.root,
             )
@@ -1024,30 +1024,30 @@ class _Application:
 
         if cancelled:
             messagebox.showinfo(
-                title="Importálás megszakítva",
+                title="Import cancelled",
                 message=(
-                    "Az importálást megszakítottad.\n"
-                    "Az import közben már elmentett évek megmaradnak."
+                    "You cancelled the import.\n"
+                    "Years already saved during this import are retained."
                 ),
                 parent=self.root,
             )
             return
 
         messagebox.showinfo(
-            title="Importálás",
-            message="Az importálási folyamat befejeződött.",
+            title="Import",
+            message="Import process completed.",
             parent=self.root,
         )
 
         if warning_messages:
             messagebox.showwarning(
-                title="Munkafüzet-figyelmeztetések",
+                title="Workbook warnings",
                 message="\n\n".join(warning_messages),
                 parent=self.root,
             )
 
     def _call_ui(self, function: Callable, *args):
-        """Felületi művelet kérése a háttérszálból."""
+        """Call ui."""
         if self._closing:
             raise _ImportCancelled()
 
@@ -1066,7 +1066,7 @@ class _Application:
                 continue
 
     def _process_ui_requests(self) -> None:
-        """A háttérszál felületi kéréseinek végrehajtása a főszálon."""
+        """Process ui requests."""
         if self._closing:
             return
 
@@ -1086,7 +1086,7 @@ class _Application:
             self.root.after(100, self._process_ui_requests)
 
 def run_gui() -> None:
-    """A grafikus alkalmazás elindítása."""
+    """Create the application root and run the Tkinter event loop."""
     root = tk.Tk()
     app = _Application(root)
     root.mainloop()

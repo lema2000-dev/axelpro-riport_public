@@ -7,20 +7,20 @@ from collections.abc import Callable
 from .models import Movement
 
 class CsvFileAccessError(OSError):
-    """A CSV-fájl olvasása sikertelen."""
+    """Csv file access error."""
 
 class CsvFormatError(ValueError):
-    """A CSV szekezete vagy valamelyik adata hibás."""
+    """Csv format error."""
 
 REQUIRED_COLUMNS = {
-    "Árumozgás időpontja",
-    "Ügylet típus",
-    "Bizonylatszám",
+    "Movement timestamp",
+    "Transaction type",
+    "Document number",
     "Partner",
-    "Csoport",
-    "Cikkszám",
-    "Ne. érték",
-    "Pénznem",
+    "Group",
+    "Item code",
+    "Net value",
+    "Currency",
 }
 
 def _parse_net_value(value: str) -> Decimal:
@@ -29,10 +29,10 @@ def _parse_net_value(value: str) -> Decimal:
     try:
         result = Decimal(normalized)
     except InvalidOperation as exc:
-        raise ValueError(f"Hibás nettó érték: {value!r}") from exc
+        raise ValueError(f"Invalid net value: {value!r}") from exc
 
     if not result.is_finite():
-        raise ValueError(f"Nem véges nettó érték: {value!r}")
+        raise ValueError(f"Non-finite net value: {value!r}")
 
     return result
 
@@ -42,7 +42,7 @@ def _parse_movement_date(value: str) -> date:
     try:
         timestamp = datetime.strptime(normalized, "%Y. %m. %d. %H:%M:%S")
     except ValueError as exc:
-        raise ValueError(f"Hibás árumozgási időpont: {value!r}") from exc
+        raise ValueError(f"Invalid movement timestamp: {value!r}") from exc
 
     return timestamp.date()
     
@@ -50,30 +50,30 @@ def _parse_movement(
     row: dict[str, str],
     request_missing_group: Callable[[str, str], str] | None = None,
 ) -> Movement:
-    currency = row["Pénznem"].strip().upper()
+    currency = row["Currency"].strip().upper()
 
     if currency not in ("HUF", "EUR"):
-        raise ValueError(f"Nem támogatott pénznem: {currency!r}")
+        raise ValueError(f"Unsupported currency: {currency!r}")
 
-    document_number = row["Bizonylatszám"].strip()
+    document_number = row["Document number"].strip()
 
     if not document_number:
-        raise ValueError("Hiányzó bizonylatszám")
+        raise ValueError("Missing document number")
 
-    group = row["Csoport"].strip()
-    item_code = row["Cikkszám"].strip()
-    transaction_type = row["Ügylet típus"].strip()
+    group = row["Group"].strip()
+    item_code = row["Item code"].strip()
+    transaction_type = row["Transaction type"].strip()
 
-    if not group and transaction_type.casefold() == "számla" and request_missing_group is not None:
+    if not group and transaction_type.casefold() == "invoice" and request_missing_group is not None:
         group = request_missing_group(document_number, item_code)
 
     return Movement(
-        movement_date=_parse_movement_date(row["Árumozgás időpontja"]),
+        movement_date=_parse_movement_date(row["Movement timestamp"]),
         transaction_type=transaction_type,
         document_number=document_number,
         group=group,
         item_code=item_code,
-        net_value=_parse_net_value(row["Ne. érték"]),
+        net_value=_parse_net_value(row["Net value"]),
         currency=currency,
     )
 
@@ -90,19 +90,19 @@ def _read_movements(
         missing_columns = REQUIRED_COLUMNS - columns
 
         if missing_columns:
-            raise ValueError("Hiányzó CSV-oszlopok: " + ", ".join(sorted(missing_columns)))
+            raise ValueError("Missing CSV columns: " + ", ".join(sorted(missing_columns)))
 
         for row in reader:
             if None in row or any(value is None for value in row.values()):
-                raise ValueError(f"Hibás CSV-szerkezet a(z) {reader.line_num}. sorban.")
+                raise ValueError(f"Invalid CSV structure on line {reader.line_num}..")
 
-            if row["Ügylet típus"].strip().casefold() == "leltár" or row["Partner"].strip().casefold() in ("cég1", "cég2"):
+            if row["Transaction type"].strip().casefold() == "inventory" or row["Partner"].strip().casefold() in ("company 1", "company 2"):
                 continue
 
             try:
                 movement = _parse_movement(row, request_missing_group)
             except ValueError as exc:
-                raise ValueError(f"Hiba a(z) {reader.line_num}. sorban: {exc}") from exc
+                raise ValueError(f"Error on line {reader.line_num}: {exc}") from exc
 
             movements.append(movement)
 
@@ -111,12 +111,12 @@ def _read_movements(
 def read_movements(
         path: str | Path,
         request_missing_group: Callable[[str, str], str] | None = None) -> list[Movement]:
-    """CSV-beolvasás a fájlhozzáférési hibák továbbadásával."""
+    """Read a UTF-16 tab-separated export and return parsed movement records."""
     try:
         return _read_movements(path, request_missing_group)
     except OSError as exc:
         raise CsvFileAccessError(
-            f"A CSV-fájl megnyitása vagy olvasása nem sikerült.\n"
-            f"Fájl: {path}\n"
-            f"Részletek: {exc}"
+            f"Could not open or read the CSV file.\n"
+            f"File: {path}\n"
+            f"Details: {exc}"
         ) from exc

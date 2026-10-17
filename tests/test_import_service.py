@@ -2,17 +2,17 @@ from datetime import date
 from decimal import Decimal
 import pytest
 from openpyxl import load_workbook
-from axelpro_riport import import_service as service
-from axelpro_riport import settings
-from axelpro_riport.models import DailyExchangeRate
-from axelpro_riport.excel_constants import (
+from sales_report import import_service as service
+from sales_report import settings
+from sales_report.models import DailyExchangeRate
+from sales_report.excel_constants import (
     PROCESSED_DOCUMENTS_SHEET,
 )
 
 
 @pytest.mark.parametrize(
     "decisions,expected",
-    [(["i", "i"], [2025, 2026]), (["n", "i"], [2026]), (["n", "n"], [])],
+    [(["y", "y"], [2025, 2026]), (["n", "y"], [2026]), (["n", "n"], [])],
 )
 def test_real_csv_to_multiple_years_only_accepted_years_saved(
     tmp_path,
@@ -26,7 +26,7 @@ def test_real_csv_to_multiple_years_only_accepted_years_saved(
 ):
     directory = tmp_path / "reports"
     directory.mkdir()
-    settings.create_settings(str(directory), ["Szűrők"])
+    settings.create_settings(str(directory), ["Filters"])
     rows = [
         movement(day=date(2026, 1, 5), document="2026", amount="20", currency="EUR"),
         movement(day=date(2025, 1, 6), document="2025", amount="10"),
@@ -47,15 +47,15 @@ def test_real_csv_to_multiple_years_only_accepted_years_saved(
     monkeypatch.setattr("builtins.input", lambda prompt: next(responses))
     service.import_csv(csv_path)
     preview = capsys.readouterr().out
-    assert "2025. évi import előnézete" in preview
-    assert "2026. évi import előnézete" in preview
+    assert "2025 import preview" in preview
+    assert "2026 import preview" in preview
     assert "new_parts: 8,000" in preview
     assert sorted(p.name for p in directory.iterdir()) == [
-        f"Napi_értékesítési_riport_{year}.xlsx" for year in expected
+        f"Sales_Report_{year}.xlsx" for year in expected
     ]
     for year in expected:
-        wb = load_workbook(directory / f"Napi_értékesítési_riport_{year}.xlsx")
-        sheet = wb["Január"]
+        wb = load_workbook(directory / f"Sales_Report_{year}.xlsx")
+        sheet = wb["January"]
         day = rows[0].movement_date if year == 2026 else rows[1].movement_date
         column = next(
             c.column
@@ -66,18 +66,18 @@ def test_real_csv_to_multiple_years_only_accepted_years_saved(
         assert list(wb[PROCESSED_DOCUMENTS_SHEET].values)[1:] == [(year, str(year))]
     if expected:
         # Re-import the same CSV: accepted files retain their amounts and keys.
-        responses = iter("i" if year in expected else "n" for year in (2025, 2026))
+        responses = iter("y" if year in expected else "n" for year in (2025, 2026))
         monkeypatch.setattr("builtins.input", lambda prompt: next(responses))
         service.import_csv(csv_path)
         preview = capsys.readouterr().out
         if expected == [2025, 2026]:
-            assert "Nincs új tétel az importáláshoz." in preview
-            assert "import előnézete" not in preview
+            assert "There are no new items to import." in preview
+            assert "import preview" not in preview
         else:
-            assert "Már feldolgozott, kihagyott tételek száma: 1" in preview
+            assert "Previously processed items skipped: 1" in preview
         for year in expected:
-            wb = load_workbook(directory / f"Napi_értékesítési_riport_{year}.xlsx")
-            sheet = wb["Január"]
+            wb = load_workbook(directory / f"Sales_Report_{year}.xlsx")
+            sheet = wb["January"]
             day = rows[0].movement_date if year == 2026 else rows[1].movement_date
             column = next(
                 c.column

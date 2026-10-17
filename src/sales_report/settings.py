@@ -6,26 +6,26 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 class SettingsStructureError(ValueError):
-    """A beállításfájl szerkezete hibás."""
+    """Settings structure error."""
 class SettingsDirectoryError(ValueError):
-    """A beállított riportkönyvtár hibás."""
+    """Settings directory error."""
 class SettingsGroupsError(ValueError):
-    """Az újalkatrész-csoportok listája hibás."""
+    """Settings groups error."""
     def __init__(self, message: str, groups: object) -> None:
         super().__init__(message)
         self.groups = groups
 
 class SettingsFileMissingError(FileNotFoundError):
-    """A beállításfájl nem található."""
+    """Settings file missing error."""
     
 class SettingsFileAccessError(OSError):
-    """A beállításfájl olvasása sikertelen."""
+    """Settings file access error."""
 
 class SettingsSaveError(OSError):
-    """A beállításfájl mentése sikertelen."""
+    """Settings save error."""
 
 class SettingsResetError(OSError):
-    """A beállítások alaphelyzetbe állytása nem fejeződött be."""
+    """Settings reset error."""
 
 @dataclass
 class Settings:
@@ -33,7 +33,7 @@ class Settings:
     additional_new_part_groups: list[str] = field(default_factory=list)
 
 def settings_path() -> Path:
-    """A helyi beállításfájl elérési útja."""
+    """Return the per-user settings path for the current operating system."""
     appdata = os.environ.get("APPDATA")
 
     if appdata:
@@ -41,10 +41,10 @@ def settings_path() -> Path:
     else:
         root = Path.home() / ".config"
 
-    return root / "axelpro_riport" / "settings.json"
+    return root / "sales_report" / "settings.json"
 
 def _save_settings(settings: Settings) -> None:
-    """A beállítások mentése ideiglenes fájlon keresztül."""
+    """Save settings."""
     path = settings_path()
     temporary_path = None
 
@@ -70,9 +70,9 @@ def _save_settings(settings: Settings) -> None:
 
     except OSError as exc:
         raise SettingsSaveError(
-            f"A beállítások mentése nem sikerült.\n"
-            f"Fájl: {path}\n"
-            f"Részletek: {exc}"
+            f"Could not save settings.\n"
+            f"File: {path}\n"
+            f"Details: {exc}"
         ) from exc
 
     finally:
@@ -83,7 +83,7 @@ def _save_settings(settings: Settings) -> None:
                 pass
 
 def _read_settings_data() -> dict:
-    """A beállítások beolvasása a mezők tartalmi ellenőrzése nélkül."""
+    """Read settings JSON without validating individual field contents."""
     path = settings_path()
 
     try:
@@ -92,25 +92,25 @@ def _read_settings_data() -> dict:
 
     except FileNotFoundError as exc:
         raise SettingsFileMissingError(
-            f"A beállításfájl nem található.\nFájl: {path}"
+            f"Settings file not found.\nFile: {path}"
         ) from exc
 
     except OSError as exc:
         raise SettingsFileAccessError(
-            f"A beállításfájl nem olvasható.\n"
-            f"Fájl: {path}\n"
-            f"Részletek: {exc}"
+            f"Cannot read the settings file.\n"
+            f"File: {path}\n"
+            f"Details: {exc}"
         ) from exc
 
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise SettingsStructureError(
-            f"A beállításfájl nem megfelelő UTF-8 JSON.\n"
-            f"Fájl: {path}"
+            f"The settings file is not valid UTF-8 JSON.\n"
+            f"File: {path}"
         ) from exc
 
     if not isinstance(data, dict):
         raise SettingsStructureError(
-            "A beállításfájlnak JSON-objektumot kell tartalmaznia."
+            "The settings file must contain a JSON object."
         )
 
     data.pop("template_sheet", None)
@@ -118,7 +118,7 @@ def _read_settings_data() -> dict:
     return data
 
 def load_settings() -> Settings:
-    """A mentett beállítások betöltése és ellenőrzése."""
+    """Read settings and validate their structure, output folder and categories."""
     data = _read_settings_data()
 
     expected_keys = {
@@ -128,33 +128,33 @@ def load_settings() -> Settings:
 
     if set(data) != expected_keys:
         raise SettingsStructureError(
-            "A beállításfájl mezői nem megfelelőek."
+            "The settings file has invalid fields."
         )
 
     directory = data["output_directory"]
 
     if not isinstance(directory, str) or not directory.strip():
         raise SettingsDirectoryError(
-            "A riportkönyvtár útvonala nem üres szöveg kell legyen."
+            "The report folder path must be a nonempty string."
         )
 
     try:
         directory_exists = Path(directory).expanduser().is_dir()
     except (OSError, ValueError) as exc:
         raise SettingsDirectoryError(
-            "A riportkönyvtár útvonala nem ellenőrizhető."
+            "Cannot check the report folder path."
         ) from exc
 
     if not directory_exists:
         raise SettingsDirectoryError(
-            "A megadott riportkönyvtár nem létező könyvtár."
+            "The report folder does not exist."
         )
 
     groups = data["additional_new_part_groups"]
 
     if not isinstance(groups, list):
         raise SettingsGroupsError(
-            "Az újalkatrész-csoportokat listában kell tárolni.",
+            "New-part categories must be stored in a list.",
             groups=groups
         )
 
@@ -163,7 +163,7 @@ def load_settings() -> Settings:
         for group in groups
     ):
         raise SettingsGroupsError(
-            "Minden csoportnévnek nem üres szövegnek kell lennie.",
+            "Each category name must be a nonempty string.",
             groups=groups
         )
 
@@ -171,7 +171,7 @@ def load_settings() -> Settings:
 
     if len(normalized_groups) != len(set(normalized_groups)):
         raise SettingsGroupsError(
-            "Az újalkatrész-csoportok között ismétlődő nevek vannak.",
+            "The new-part category list contains duplicate names.",
             groups=groups
         )
 
@@ -182,7 +182,7 @@ def change_output_directory(
     *,
     validate_settings: bool = True,
 ) -> None:
-    """A riportkönyvtár módosítása, opcionális előzetes ellenőrzéssel."""
+    """Change output directory."""
     if validate_settings:
         settings = load_settings()
     else:
@@ -192,7 +192,7 @@ def change_output_directory(
     _save_settings(settings)
 
 def add_new_part_groups(groups: list[str]) -> None:
-    """Az újalkatrész-csoportok listájának bővítése."""
+    """Add new part groups."""
     settings = load_settings()
 
     for group in groups:
@@ -202,7 +202,7 @@ def add_new_part_groups(groups: list[str]) -> None:
     _save_settings(settings)
 
 def remove_new_part_groups(groups: list[str]) -> None:
-    """Az újalkatrész-csoportok listájának csökkentése."""
+    """Remove new part groups."""
     settings = load_settings()
 
     settings.additional_new_part_groups = [
@@ -215,7 +215,7 @@ def create_settings(
     output_directory: str,
     additional_new_part_groups: list[str],
 ) -> Settings:
-    """A megadott beállítások létrehozása és mentése."""
+    """Create settings."""
     settings = Settings(
         output_directory=output_directory,
         additional_new_part_groups=additional_new_part_groups,
@@ -226,16 +226,16 @@ def create_settings(
     return settings
 
 def reset() -> None:
-    """A beállításfájl és az üres beállításmappa törlése."""
+    """Reset."""
     path = settings_path()
 
     try:
         path.unlink(missing_ok=True)
     except OSError as exc:
         raise SettingsResetError(
-            f"A beállításfájl törlése nem sikerült.\n"
-            f"Fájl: {path}\n"
-            f"Részletek: {exc}"
+            f"Could not delete the settings file.\n"
+            f"File: {path}\n"
+            f"Details: {exc}"
         ) from exc
 
     try:
@@ -244,14 +244,14 @@ def reset() -> None:
         pass
     except OSError as exc:
         raise SettingsResetError(
-            "A beállításfájl már nem létezik, "
-            "de a beállításmappa eltávolítása nem sikerült.\n"
-            f"Mappa: {path.parent}\n"
-            f"Részletek: {exc}"
+            "The settings file no longer exists, "
+            "but the settings folder could not be removed.\n"
+            f"Folder: {path.parent}\n"
+            f"Details: {exc}"
         ) from exc
 
 def replace_new_part_groups(groups: list[str]) -> None:
-    """A további újalkatrész-csoportok teljes listájának cseréje."""
+    """Replace new part groups."""
     data = _read_settings_data()
     data["additional_new_part_groups"] = groups
 

@@ -18,8 +18,8 @@ def _find_workshop_documents(movements: list[Movement]) -> set[tuple[int, str]]:
     return {
         movement.document_key
         for movement in movements
-        if movement.transaction_type.casefold() == "számla"
-        and movement.group.casefold() == "munkadíj"
+        if movement.transaction_type.casefold() == "invoice"
+        and movement.group.casefold() == "labor"
     }
 
 
@@ -32,10 +32,10 @@ def _net_value_in_huf(
     rate = exchange_rates.get(movement.movement_date)
 
     if rate is None:
-        raise ValueError(f"Hiányzó EUR/HUF árfolyam: {movement.movement_date}")
+        raise ValueError(f"Missing EUR/HUF rate: {movement.movement_date}")
 
     if not rate.is_finite() or rate <= 0:
-        raise ValueError(f"Hibás EUR/HUF árfolyam: {movement.movement_date} -> {rate}")
+        raise ValueError(f"Invalid EUR/HUF rate: {movement.movement_date} -> {rate}")
 
     return movement.net_value * rate
 
@@ -49,7 +49,7 @@ def _is_new_part(movement: Movement, new_part_groups: set[str]) -> bool:
 
 
 def _prepare_new_part_groups(additional_groups: set[str]) -> set[str]:
-    return {"új alkatrész"} | {
+    return {"new parts"} | {
         group.strip().casefold() for group in additional_groups if group.strip()
     }
 
@@ -79,14 +79,14 @@ def _calculate_daily_totals(
         transaction_type = movement.transaction_type.casefold()
         group = movement.group.casefold()
 
-        if transaction_type == "számla" and (
-            group == "bontott alkatrész"
+        if transaction_type == "invoice" and (
+            group == "used parts"
             or _is_new_part(movement, new_part_groups)
-            or group == "munkadíj"
+            or group == "labor"
         ):
             value = _net_value_in_huf(movement, exchange_rates)
 
-            if group == "bontott alkatrész":
+            if group == "used parts":
                 totals["used_parts"] += value
 
                 if movement.document_key in workshop_documents:
@@ -98,14 +98,14 @@ def _calculate_daily_totals(
                 if movement.document_key in workshop_documents:
                     totals["workshop_new_parts"] += value
 
-            elif group == "munkadíj":
+            elif group == "labor":
                 totals["labor"] += value
 
-        if transaction_type == "beszerzés" and group:
+        if transaction_type == "purchase" and group:
             value = _net_value_in_huf(movement, exchange_rates)
             totals["purchases"] += value
 
-        if group == "szállítási költség":
+        if group == "shipping":
             value = _net_value_in_huf(movement, exchange_rates)
             totals["shipping"] += value
 
@@ -133,16 +133,16 @@ def _calculate_monthly_totals(
     exchange_rates: dict[date, Decimal],
 ) -> MonthlyTotals:
     totals = {
-        "sany": Decimal(0),
-        "diag": Decimal(0),
-        "kj": Decimal(0),
+        "consumables": Decimal(0),
+        "diagnostics": Decimal(0),
+        "air_conditioning": Decimal(0),
     }
 
     for movement in movements:
         if movement.movement_date.year != year or movement.movement_date.month != month:
             continue
 
-        if movement.transaction_type.casefold() != "számla":
+        if movement.transaction_type.casefold() != "invoice":
             continue
 
         item_code = movement.item_code.casefold()
@@ -156,9 +156,9 @@ def _calculate_monthly_totals(
     return MonthlyTotals(
         year=year,
         month=month,
-        sany=_round_huf(totals["sany"]),
-        diag=_round_huf(totals["diag"]),
-        kj=_round_huf(totals["kj"]),
+        consumables=_round_huf(totals["consumables"]),
+        diagnostics=_round_huf(totals["diagnostics"]),
+        air_conditioning=_round_huf(totals["air_conditioning"]),
     )
 
 
@@ -168,7 +168,7 @@ def _aggregate_movements(
     exchange_rates: dict[date, Decimal],
     additional_new_part_groups: set[str],
 ) -> ImportResult | None:
-    """Már előszűrt tételek napi és havi összesítése."""
+    """Aggregate movements."""
     new_movements = _filter_new_movements(movements, processed_documents)
 
     if not new_movements:
@@ -218,7 +218,7 @@ def process_movements(
     exchange_rates: dict[date, Decimal],
     additional_new_part_groups: set[str],
 ) -> ImportResult | None:
-    """Szűrés, majd napi és havi összesítés."""
+    """Skip recorded documents and calculate daily and monthly import totals."""
     return _aggregate_movements(
         movements,
         processed_documents,

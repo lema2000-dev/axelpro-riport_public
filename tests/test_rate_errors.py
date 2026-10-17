@@ -3,7 +3,7 @@ from http.client import HTTPException, IncompleteRead
 from unittest.mock import Mock
 import pytest
 from openpyxl import Workbook
-from axelpro_riport import rates_read_and_correction as rates
+from sales_report import rates_read_and_correction as rates
 
 
 @pytest.mark.parametrize(
@@ -41,7 +41,7 @@ def test_manual_rate_retries_invalid_number(monkeypatch, capsys, invalid):
     result = rates._request_manual_exchange_rate(date(2026, 9, 18))
     assert str(result.rate) == "400.25"
     assert result.source_date == date(2026, 10, 12)
-    assert "Pozitív, véges" in capsys.readouterr().out
+    assert "positive, finite" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("invalid", ["", "2026-02-30", "20261012", "2026/10/12", "abc"])
@@ -54,5 +54,5 @@ def test_manual_date_retries_without_requesting_rate_again(monkeypatch, capsys, 
     monkeypatch.setattr("builtins.input", answer)
     result = rates._request_manual_exchange_rate(date(2026, 9, 18))
     assert result.source_date == date(2026, 10, 12)
-    assert sum("EUR-árfolyam" in prompt for prompt in prompts) == 1
-    assert "Érvényes dátumot" in capsys.readouterr().out
+    assert sum("EUR exchange rate" in prompt for prompt in prompts) == 1
+    assert "valid date" in capsys.readouterr().out

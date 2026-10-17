@@ -1,4 +1,4 @@
-"""Önálló, ügyféladatoktól és hálózattól független tesztadatok."""
+"""Conftest."""
 
 import csv
 import sys
@@ -9,7 +9,7 @@ import pytest
 from openpyxl import Workbook
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from axelpro_riport.models import Movement
+from sales_report.models import Movement
 
 
 @pytest.fixture
@@ -17,10 +17,10 @@ def movement():
     def make(
         day=date(2026, 1, 5),
         document="SZ-1",
-        group="Új alkatrész",
+        group="New parts",
         amount="100",
         currency="HUF",
-        transaction="Számla",
+        transaction="Invoice",
         item="PART",
     ):
         return Movement(
@@ -34,14 +34,14 @@ def movement():
 def write_csv():
     def write(path, rows, *, partners=None):
         columns = [
-            "Árumozgás időpontja",
-            "Ügylet típus",
-            "Bizonylatszám",
+            "Movement timestamp",
+            "Transaction type",
+            "Document number",
             "Partner",
-            "Csoport",
-            "Cikkszám",
-            "Ne. érték",
-            "Pénznem",
+            "Group",
+            "Item code",
+            "Net value",
+            "Currency",
         ]
         with path.open("w", encoding="utf-16", newline="") as stream:
             writer = csv.writer(stream, delimiter="\t")
@@ -52,7 +52,7 @@ def write_csv():
                         m.movement_date.strftime("%Y. %m. %d. 12:00:00"),
                         m.transaction_type,
                         m.document_number,
-                        "Tesztpartner" if partners is None else partners[index],
+                        "Example customer" if partners is None else partners[index],
                         m.group,
                         m.item_code,
                         str(m.net_value).replace(".", ","),
@@ -67,9 +67,9 @@ def write_csv():
 @pytest.fixture
 def template_sheet():
     sheet = Workbook().active
-    sheet.title = "Szeptember"
+    sheet.title = "September"
     for row in range(1, 86):
-        sheet.cell(row, 1, f"Sor {row}")
+        sheet.cell(row, 1, f"Row {row}")
     for col in range(2, 14, 2):
         sheet.cell(2, col, date(2026, 9, 14 + (col - 2) // 2))
         sheet.cell(8, col, 999)
@@ -87,7 +87,7 @@ def template_sheet():
 
 @pytest.fixture
 def settings_location(monkeypatch, tmp_path):
-    from axelpro_riport import settings, console
+    from sales_report import settings, console
 
     path = tmp_path / "config" / "settings.json"
     monkeypatch.setattr(settings, "settings_path", lambda: path)
@@ -97,14 +97,14 @@ def settings_location(monkeypatch, tmp_path):
 
 @pytest.fixture(scope="session")
 def year_report_bytes():
-    """Valódi éves riport, egyszer generálva; a tesztek külön példányt kapnak."""
+    """Year report bytes."""
     from io import BytesIO
-    from axelpro_riport.template_creator import create_template_workbook
-    from axelpro_riport.excel_create_workbook import create_year_workbook
+    from sales_report.template_creator import create_template_workbook
+    from sales_report.excel_create_workbook import create_year_workbook
 
     template = create_template_workbook()
     try:
-        workbook = create_year_workbook(template["Szeptember"], 2026)
+        workbook = create_year_workbook(template["September"], 2026)
         stream = BytesIO()
         workbook.save(stream)
         workbook.close()

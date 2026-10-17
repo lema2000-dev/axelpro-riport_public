@@ -3,9 +3,9 @@ from decimal import Decimal
 from urllib.error import URLError
 import pytest
 from openpyxl import Workbook
-from axelpro_riport import rates_read_and_correction as rates
-from axelpro_riport.models import DailyExchangeRate
-from axelpro_riport.excel_constants import DAILY_EXCHANGE_RATES_SHEET
+from sales_report import rates_read_and_correction as rates
+from sales_report.models import DailyExchangeRate
+from sales_report.excel_constants import DAILY_EXCHANGE_RATES_SHEET
 
 
 class FixedDate(date):
@@ -51,7 +51,7 @@ def test_reads_years_preserves_existing_today_and_uses_previous_source(
     assert result[date(2026, 10, 10)].rate == Decimal(400)
     assert result[date(2027, 1, 4)].source_date == date(2026, 10, 9)
     assert date(2026, 1, 1) not in result
-    assert not (tmp_path / "Napi_értékesítési_riport_2027.xlsx").exists()
+    assert not (tmp_path / "Sales_Report_2027.xlsx").exists()
 
 
 @pytest.mark.parametrize("exception", [URLError("offline"), TimeoutError()])

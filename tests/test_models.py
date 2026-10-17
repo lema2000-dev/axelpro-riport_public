@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 import pytest
-from axelpro_riport.models import DailyExchangeRate
+from sales_report.models import DailyExchangeRate
 
 
 @pytest.mark.parametrize("rate", ["0", "-1", "NaN", "Infinity", "1E999"])

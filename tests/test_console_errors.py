@@ -1,11 +1,11 @@
-"""Hibák konzolos megjelenítése és visszatérés a menübe."""
+"""Test console errors."""
 
 from pathlib import Path
 import warnings
 import pytest
-from axelpro_riport import console as c, settings as s
-from axelpro_riport.csv_reader import CsvFileAccessError
-from axelpro_riport.excel_files import (
+from sales_report import console as c, settings as s
+from sales_report.csv_reader import CsvFileAccessError
+from sales_report.excel_files import (
     WorkbookFileAccessError,
     WorkbookSaveError,
     WorkbookValidationError,
@@ -43,8 +43,8 @@ def test_import_errors_return_to_menu_without_success(
     c.run_console()
     output = capsys.readouterr().out
     assert str(error) in output
-    assert "befejeződött" not in output
-    assert output.count("=== AxelPro riport ===") == 2
+    assert "completed" not in output
+    assert output.count("=== Sales Report ===") == 2
 
 
 def test_import_warnings_print_once_after_import_returns(
@@ -67,7 +67,7 @@ def test_import_warnings_print_once_after_import_returns(
     assert output.count("FORMATTING TEST") == 1
     assert "SECOND FORMATTING TEST" not in output
     assert output.index("SAVE FINISHED") < output.index(
-        "Figyelmeztetés: FORMATTING TEST"
+        "Warning: FORMATTING TEST"
     )
 
 
@@ -82,7 +82,7 @@ def test_startup_failure_exits_before_menu(monkeypatch, capsys, error):
     monkeypatch.setattr(c, "_ensure_settings", fail)
     c.run_console()
     output = capsys.readouterr().out
-    assert str(error) in output and "=== AxelPro riport ===" not in output
+    assert str(error) in output and "=== Sales Report ===" not in output
 
 
 def test_missing_settings_during_operation_are_recreated(
@@ -120,7 +120,7 @@ def test_invalid_groups_display_and_replace(
     c.run_console()
     assert s.load_settings().additional_new_part_groups == ["Correct"]
     output = capsys.readouterr().out
-    assert ("A jelenleg tárolt elemek:" in output) == isinstance(stored_groups, list)
+    assert ("Currently stored items:" in output) == isinstance(stored_groups, list)
 
 
 def test_invalid_directory_repair(tmp_path, settings_location, monkeypatch):
@@ -154,7 +154,7 @@ def test_failure_during_repair_is_printed_without_recursive_retry(
     monkeypatch.setattr(c, "reset", fail)
     c._handle_settings_error(s.SettingsStructureError("bad structure"))
     output = capsys.readouterr().out
-    assert "A beállítások javítása nem sikerült" in output
+    assert "Could not repair settings" in output
     assert str(error) in output
 
 
@@ -170,7 +170,7 @@ def test_reset_failure_returns_to_menu(
     answers(monkeypatch, ["6", "0"])
     c.run_console()
     assert settings_location.exists()
-    assert capsys.readouterr().out.count("=== AxelPro riport ===") == 2
+    assert capsys.readouterr().out.count("=== Sales Report ===") == 2
 
 
 def test_view_settings_does_not_write_file(
@@ -201,9 +201,9 @@ def test_path_failure_reprompts_and_can_cancel(monkeypatch, capsys, kind, method
 
 
 @pytest.mark.parametrize("answer,expected", [
-    ("1", "Új alkatrész"), ("2", "Bontott alkatrész"),
-    ("3", "Munkadíj"), ("4", "Szállítási költség"),
-    ("5", "Trailer"), ("0", ""), (" 1 ", "Új alkatrész"),
+    ("1", "New parts"), ("2", "Used parts"),
+    ("3", "Labor"), ("4", "Shipping"),
+    ("5", "Trailer"), ("0", ""), (" 1 ", "New parts"),
 ])
 def test_ungrouped_invoice_console_decision(monkeypatch, capsys, answer, expected):
     answers(monkeypatch, ["wrong", answer])

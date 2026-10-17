@@ -1,9 +1,9 @@
-"""Beállítási tartalom-, olvasási, mentési és reset-hibák."""
+"""Test settings errors."""
 
 import json
 from pathlib import Path
 import pytest
-from axelpro_riport import settings as s
+from sales_report import settings as s
 
 
 def write_data(path, data):
@@ -156,7 +156,7 @@ def test_reset_file_failure_preserves_settings(
         raise PermissionError("delete denied")
 
     monkeypatch.setattr(Path, "unlink", deny)
-    with pytest.raises(s.SettingsResetError, match="beállításfájl törlése"):
+    with pytest.raises(s.SettingsResetError, match="Could not delete the settings file"):
         s.reset()
     assert settings_location.exists()
 
@@ -165,7 +165,7 @@ def test_reset_nonempty_directory_reports_partial_result(settings_location, tmp_
     s.create_settings(str(tmp_path), [])
     other = settings_location.parent / "other.txt"
     other.write_text("keep")
-    with pytest.raises(s.SettingsResetError, match="már nem létezik"):
+    with pytest.raises(s.SettingsResetError, match="no longer exists"):
         s.reset()
     assert not settings_location.exists()
     assert other.read_text() == "keep"

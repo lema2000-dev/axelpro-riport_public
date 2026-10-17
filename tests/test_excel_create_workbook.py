@@ -1,8 +1,8 @@
 from calendar import monthrange
 from datetime import date
 import pytest
-from axelpro_riport.excel_create_workbook import create_year_workbook
-from axelpro_riport.excel_constants import (
+from sales_report.excel_create_workbook import create_year_workbook
+from sales_report.excel_constants import (
     MONTH_NAMES,
     DAILY_EXCHANGE_RATES_SHEET,
     PROCESSED_DOCUMENTS_SHEET,
@@ -13,8 +13,8 @@ from axelpro_riport.excel_constants import (
 def test_full_year_dates_hidden_registers_and_summary(template_sheet, year):
     wb = create_year_workbook(template_sheet, year)
     assert set(wb.sheetnames) == set(MONTH_NAMES) | {
-        "Euro",
-        "Összesítő",
+        "Exchange_Rates",
+        "Summary",
         DAILY_EXCHANGE_RATES_SHEET,
         PROCESSED_DOCUMENTS_SHEET,
     }
@@ -33,11 +33,11 @@ def test_full_year_dates_hidden_registers_and_summary(template_sheet, year):
                 assert sheet.cell(8, cell.column).value is None
         assert sheet["B82"].value is None
         assert sheet["B49"].value == "=B46+B47+B48"
-        assert f"'Euro'!$B${month + 1}" in sheet["B60"].value
-        assert wb["Összesítő"].cell(2, month + 1).value == name
-        assert f"'{name}'!B82" in wb["Összesítő"].cell(40, month + 1).value
-        assert wb["Euro"].cell(month + 1, 2).value == 0
-        assert wb["Euro"].cell(month + 1, 3).value is None
+        assert f"'Exchange_Rates'!$B${month + 1}" in sheet["B60"].value
+        assert wb["Summary"].cell(2, month + 1).value == name
+        assert f"'{name}'!B82" in wb["Summary"].cell(40, month + 1).value
+        assert wb["Exchange_Rates"].cell(month + 1, 2).value == 0
+        assert wb["Exchange_Rates"].cell(month + 1, 3).value is None
     for name in (DAILY_EXCHANGE_RATES_SHEET, PROCESSED_DOCUMENTS_SHEET):
         assert wb[name].sheet_state == "veryHidden"
         assert wb[name].max_row == 1
@@ -46,23 +46,23 @@ def test_full_year_dates_hidden_registers_and_summary(template_sheet, year):
 
 def test_january_fifth_is_in_second_week_not_left_padding(template_sheet):
     wb = create_year_workbook(template_sheet, 2026)
-    jan = wb["Január"]
+    jan = wb["January"]
     assert jan["B2"].value == date(2026, 1, 1)
     assert jan["J2"].value == date(2026, 1, 5)
     assert jan["H2"].value == 1
     assert jan["H12"].value == "=B12+D12+F12"
 
 
-def test_generated_months_preserve_corrected_monthly_final_formula(year_report):
+def test_generated_months_leave_removed_private_formula_blank(year_report):
     for name in MONTH_NAMES:
         sheet = year_report[name]
-        assert sheet["B85"].value == "=(B75-6000000)*0.05"
+        assert sheet["B85"].value is None
         assert sheet.freeze_panes == "D4"
 
 
 def test_freeze_panes_survive_save_and_reload(year_report):
-    # A year_report fixture már elmentett és visszatöltött munkafüzetet ad.
+    # The year_report fixture provides a workbook saved and loaded again.
     for name in MONTH_NAMES:
         assert year_report[name].freeze_panes == "D4"
-    for name in ("Euro", "Összesítő", DAILY_EXCHANGE_RATES_SHEET, PROCESSED_DOCUMENTS_SHEET):
+    for name in ("Exchange_Rates", "Summary", DAILY_EXCHANGE_RATES_SHEET, PROCESSED_DOCUMENTS_SHEET):
         assert year_report[name].freeze_panes is None

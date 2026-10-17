@@ -1,5 +1,5 @@
 import pytest
-from axelpro_riport import console, settings
+from sales_report import console, settings
 
 
 def answers(monkeypatch, values):
@@ -14,14 +14,14 @@ def test_first_start_reprompts_directory_and_groups(
     wrong.touch()
     answers(
         monkeypatch,
-        ["", str(wrong), str(tmp_path), "A;;B", "A;A", " Szűrők ; Elektronika ", "0"],
+        ["", str(wrong), str(tmp_path), "A;;B", "A;A", " Filters ; Electronics ", "0"],
     )
     console.run_console()
     loaded = settings.load_settings()
     assert loaded == settings.Settings(
-        str(tmp_path.resolve()), ["Szűrők", "Elektronika"]
+        str(tmp_path.resolve()), ["Filters", "Electronics"]
     )
-    assert "Próbáld újra" in capsys.readouterr().out
+    assert "Try again" in capsys.readouterr().out
 
 
 def test_menu_import_add_remove_change_directory(
@@ -58,7 +58,7 @@ def test_menu_import_add_remove_change_directory(
     assert settings.load_settings() == settings.Settings(
         str(tmp_path.resolve()), ["Other"]
     )
-    assert "Érvénytelen választás" in capsys.readouterr().out
+    assert "Invalid selection" in capsys.readouterr().out
 
 
 def test_first_start_allows_empty_groups(monkeypatch, tmp_path, settings_location):
@@ -79,9 +79,9 @@ def test_first_start_zero_reprompts_instead_of_cancelling(
     console.run_console()
     assert settings.load_settings() == settings.Settings(str(tmp_path.resolve()), [])
     output = capsys.readouterr().out
-    assert "megszakítva" not in output
-    assert "megszakítása: 0" not in output
-    assert "A beállításokat elmentettük." in output
+    assert "cancelled" not in output
+    assert "cancel: 0" not in output
+    assert "Settings saved." in output
 
 
 @pytest.mark.parametrize(
@@ -100,15 +100,15 @@ def test_cancellation_returns_to_menu_without_calling_operation(
     before = settings_location.read_bytes()
 
     def unexpected(**kwargs):
-        pytest.fail("Megszakított műveletet nem szabad elindítani.")
+        pytest.fail("A cancelled operation must not be started.")
 
     monkeypatch.setattr(console, operation, unexpected)
     answers(monkeypatch, [choice, "0", "0"])
     console.run_console()
     assert settings_location.read_bytes() == before
     output = capsys.readouterr().out
-    assert output.count("=== AxelPro riport ===") == 2
-    assert "elmentettük" not in output and "befejeződött" not in output
+    assert output.count("=== Sales Report ===") == 2
+    assert "saved" not in output and "completed" not in output
 
 
 def test_reset_removes_settings_exits_and_keeps_reports(

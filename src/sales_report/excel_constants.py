@@ -1,16 +1,16 @@
-"""A riport sablonjának cellái, munkalapnevei és tartományai."""
+"""Worksheet names, template ranges and report target cells."""
 
 MONTH_NAMES = (
-    "Január",
-    "Február",
-    "Március",
-    "Április",
-    "Május",
-    "Június",
-    "Július",
-    "Augusztus",
-    "Szeptember",
-    "Október",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
     "November",
     "December",
 )
@@ -31,9 +31,9 @@ MONTHLY_CLOSE_START_COLUMN = 1
 
 MONTHLY_CLOSE_END_COLUMN = 3
 
-PROCESSED_DOCUMENTS_SHEET = "_importált_bizonylatok"
+PROCESSED_DOCUMENTS_SHEET = "_imported_documents"
 
-DAILY_EXCHANGE_RATES_SHEET = "_napi_árfolyamok"
+DAILY_EXCHANGE_RATES_SHEET = "_daily_exchange_rates"
 
 DAILY_TARGET_ROWS = {
     "used_parts": 8,
@@ -47,7 +47,7 @@ DAILY_TARGET_ROWS = {
 }
 
 MONTHLY_TARGET_ROWS = {
-    "sany": 82,
-    "diag": 83,
-    "kj": 84,
+    "consumables": 82,
+    "diagnostics": 83,
+    "air_conditioning": 84,
 }

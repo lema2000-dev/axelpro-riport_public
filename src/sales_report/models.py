@@ -36,9 +36,9 @@ class DailyTotals:
 class MonthlyTotals:
     year: int
     month: int
-    sany: int
-    diag: int
-    kj: int
+    consumables: int
+    diagnostics: int
+    air_conditioning: int
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ class DailyExchangeRate:
     rate: Decimal
 
     def __post_init__(self) -> None:
-        """A külső vagy Excelből olvasott rekord egyszeri ellenőrzése."""
+        """Reject invalid dates or rates that cannot be represented in Excel."""
         if (
             not isinstance(self.application_date, date)
             or isinstance(self.application_date, datetime)
@@ -65,7 +65,7 @@ class DailyExchangeRate:
             or not self.rate.is_finite()
             or self.rate <= 0
         ):
-            raise ValueError("Hibás napi árfolyamrekord.")
+            raise ValueError("Invalid daily exchange rate record.")
         numeric_rate = float(self.rate)
         if not isfinite(numeric_rate) or numeric_rate <= 0:
-            raise ValueError("Excelben nem tárolható árfolyam.")
+            raise ValueError("Exchange rate cannot be stored in Excel.")

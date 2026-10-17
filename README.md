@@ -1,143 +1,143 @@
-# CSV–Excel riportautomatizálás – használati útmutató
+# CSV–Excel Report Automation – User Guide
 
-Az alkalmazás árumozgási CSV-exportok alapján tölti ki az éves Excel értékesítési riportokat. A program a napi és havi nettó összegeket forintban írja be, az EUR-tételeket a tárolt napi árfolyammal váltja át.
+The application fills annual Excel sales reports based on movement CSV exports. The program writes daily and monthly net amounts in HUF and converts EUR items using the stored daily exchange rate.
 
-A fejlesztési munkaterv, az ellenőrzések állapota és a részletes feldolgozási szabályok a [Statement_of_Work.md](Statement_of_Work.md) fájlban találhatók.
+The development work plan, the status of checks and the detailed processing rules can be found in [Statement_of_Work.md](Statement_of_Work.md).
 
-## A bemutatott változat
+## The version presented
 
-Ez a magyar nyelvű, anonimizált portfólióváltozat dokumentációja. A projekt egy valós riportkészítési folyamat automatizálását mutatja be, személynevek és ügyfélhez köthető feliratok nélkül. A bemutatóadatok fiktív ügyleteket tartalmaznak.
+This is the documentation for the Hungarian-language, anonymized portfolio version. The project demonstrates the automation of a real reporting workflow, without personal names or labels linked to the client. The demonstration data contains fictional transactions.
 
-A magyar és az angol változat külön Git-ágon szerepel. A GitHub ágkiválasztójával lehet köztük váltani.
+The Hungarian and English versions are on separate Git branches. You can switch between them using GitHub's branch selector.
 
-A magyar változatban a CSV-fejlécek, kategóriák és a felület magyar elnevezései megmaradnak. Az alábbi futtatható fájlnevek és beállítási útvonalak a jelenlegi technikai azonosítókat követik.
+In the Hungarian version, the CSV headers, categories and Hungarian interface names are retained. The executable filenames and settings paths below follow the current technical identifiers.
 
-## Indítás és első beállítás
+## Launch and initial setup
 
-1. Indítsd el az átadott `AxelProRiport.exe` fájlt. A csomagolt alkalmazáshoz nem kell Pythont telepíteni, és külső sablonfájl sem szükséges.
-2. Első indításkor tallózással válaszd ki a már létező, számodra írható mappát, ahová az éves riportokat szeretnéd menteni. Például hozz létre egy **Értékesítési riportok** mappát a **Dokumentumok** alatt. A `C:\` gyökerét ne válaszd célmappának; a normál használathoz nem kell rendszergazdaként indítani a programot.
-3. Add meg a további újalkatrész-csoportok neveit pontosvesszővel elválasztva, például `Szűrők;Kenőanyagok`, majd kattints a **Kész** gombra. Ha nincs további csoport, ezt a mezőt üresen hagyhatod.
-4. Megjelenik a főmenü. A beállításokat a program megőrzi a következő indításhoz.
+1. Launch the supplied `SalesReport.exe` file. The packaged application does not require Python to be installed, and no external template file is needed.
+2. On first launch, browse to an existing folder that you can write to and where you want to save the annual reports. For example, create a **Sales Reports** folder under **Documents**. Do not select the root of `C:\` as the destination folder; the program does not need to be run as administrator for normal use.
+3. Enter the names of additional new-part groups separated by semicolons, for example `Filters;Lubricants`, then click **Done**. If there are no additional groups, you can leave this field empty.
+4. The main menu appears. The program retains the settings for the next launch.
 
-Az `Új alkatrész` csoportot a program eleve új alkatrészként kezeli, ezt nem kell külön felvenni. A csoportnevek felismerése kis- és nagybetűtől független. A nevek az exportban szereplő csoportnevekkel egyezzenek meg.
+The program already treats the `New parts` group as new parts, so you do not need to add it separately. Group names are recognized without regard to case. The names must match the group names in the export.
 
-Az `AxelProRiport-dev.exe` azonos grafikus felületet indít konzolablakkal; a normál használathoz az `AxelProRiport.exe` szolgál.
+`SalesReport-dev.exe` launches the same graphical interface with a console window; `SalesReport.exe` is intended for normal use.
 
-## CSV előkészítése és szerkesztése
+## Preparing and editing CSV files
 
-Az eredeti exportot közvetlenül importálhatod. Ha előtte meg szeretnéd nézni vagy módosítani a tartalmát, **Rons Data Edit** használatát javasoljuk, amelyet a Windowsos próbák során is használtunk.
+You can import the original export directly. If you want to view or modify its contents beforehand, we recommend **Rons Data Edit**, which we also used during the Windows tests.
 
-A Rons Data Edit táblázatként mutatja a fájlt, az értékeket szövegként kezeli, és támogatja az export UTF–16 kódolását. Ez azért fontos, mert az Excel CSV-megnyitás és újramentés közben automatikusan átalakíthatja a dátumokat, számokat vagy azonosítókat; az ilyen módosítás miatt a riportprogram elutasíthatja a fájlt.
+Rons Data Edit displays the file as a table, treats values as text and supports the export's UTF–16 encoding. This is important because Excel can automatically convert dates, numbers or identifiers when opening and resaving CSV files; such changes may cause the reporting program to reject the file.
 
-- [Hivatalos termékoldal](https://www.ronsplace.ca/products/ronsdataedit)
-- [Hivatalos letöltés](https://www.ronsplace.ca/products/download) – a **Rons Data Edit** résznél válaszd a **Download Install** lehetőséget. A **Download Portable** változat telepítés nélküli használatra szolgál.
-- Az ingyenes **Lite** változat legfeljebb **2500 sort tud menteni**. Nagyobb fájl módosításához a korlátozás nélküli változat szükséges. Ez a CSV-szerkesztő korlátja, nem a riportprogram importkorlátja.
+- [Official product page](https://www.ronsplace.ca/products/ronsdataedit)
+- [Official download](https://www.ronsplace.ca/products/download) – select **Download Install** in the **Rons Data Edit** section. The **Download Portable** version is intended for use without installation.
+- The free **Lite** version can save up to **2500 rows**. Modifying larger files requires the unrestricted version. This is a limitation of the CSV editor, not an import limit of the reporting program.
 
-Szerkesztéskor őrizd meg az **UTF–16 kódolást**, a **tabulátoros elválasztást**, az eredeti oszlopfejléceket és a változatlan mezők szövegét. Ha a szerkesztő beállítást kér, az elválasztó legyen **Tab**, a kódolás **UTF–16**. Ne futtass automatikus dátum- vagy számátalakítást. CSV-t Excelből ne ments újra ehhez az importhoz; az elkészült `.xlsx` riportokat viszont Excelben használhatod.
+When editing, preserve the **UTF–16 encoding**, **tab-separated format**, original column headers and the text of fields you have not changed. If the editor asks for settings, use **Tab** as the separator and **UTF–16** as the encoding. Do not run automatic date or number conversions. Do not resave CSV files from Excel for this import; you can, however, use the completed `.xlsx` reports in Excel.
 
-A szükséges oszlopok:
+Required columns:
 
-| Oszlop | Elvárt tartalom |
+| Column | Expected content |
 | --- | --- |
-| Árumozgás időpontja | Az export eredeti dátumformátuma, például `2026. 09. 18. 10:00:00`. |
-| Ügylet típus | Az export szerinti ügylettípus. A leltártételeket az import kihagyja. |
-| Bizonylatszám | A feldolgozott tétel nem üres bizonylatszáma. |
-| Partner | Kötelező oszlop; a két kizárt partner tételeit a program automatikusan kihagyja. |
-| Csoport | Csoportnév; üres számlacsoportnál választást kér, az üres csoportú beszerzés összegét kihagyja. |
-| Cikkszám | A tétel cikkszáma; a `SANY`, `DIAG`, `KJ` kódokhoz külön havi összeg tartozik. |
-| Ne. érték | Nettó érték, például `1250,50`. |
-| Pénznem | `HUF` vagy `EUR`. |
+| Movement timestamp | The export's original date format, for example `2026. 09. 18. 10:00:00`. |
+| Transaction type | The transaction type used in the export. Inventory items are skipped during import. |
+| Document number | The processed item's nonempty document number. |
+| Partner | Required column; the program automatically skips items belonging to the two excluded partners. |
+| Group | Group name; an empty invoice group prompts for a choice, while the amount of a purchase with an empty group is excluded. |
+| Item code | The item's item code; separate monthly totals are maintained for the `SANY`, `DIAG`, `KJ` codes. |
+| Net value | Net value, for example `1250,50`. |
+| Currency | `HUF` or `EUR`. |
 
-### Automatikusan kihagyott tételek
+### Automatically skipped items
 
-A program a leltártételek mellett **ügylettípustól függetlenül kihagyja** azokat a sorokat, amelyek Partner mezőjében az alábbi nevek valamelyike szerepel:
+In addition to inventory items, the program **skips rows regardless of transaction type** if their Partner field contains one of the following names:
 
-- Cég1
-- Cég2
+- Company 1
+- Company 2
 
-A `Cég1` és `Cég2` fiktív megnevezések: a publikus CSV-beolvasó kizárási értékeinek és a próba-CSV-k partnerneveinek is ezekkel kell egyezniük. A táblázat feliratainak átnevezése önmagában nem módosítja a beolvasó szűrését.
+`Company 1` and `Company 2` are fictional names: the exclusion values in the public CSV reader and the partner names in the test CSVs must also match them. Renaming labels in the spreadsheet alone does not change the reader's filtering.
 
-Az összehasonlítás teljes névegyezést használ, a szélső szóközöket és a kis-/nagybetűk eltérését figyelmen kívül hagyja. E tételek nem kerülnek az összesítésekbe vagy a bizonylatnyilvántartásba. Kizárt partner üres csoportú számlájánál sem kér a program besorolást.
+The comparison uses an exact full-name match, ignoring leading and trailing spaces and differences in case. These items are not included in totals or in the document register. The program does not request a classification even if an excluded partner's invoice has an empty group.
 
-A **beszerzésekből csak a csoporttal rendelkező tételek összege számít bele** a napi beszerzési összegbe. Az üres vagy csak szóközös csoportú beszerzések kimaradnak ebből az összegből, de bizonylataik feldolgozottként nyilvántartásba kerülnek. Beszerzésnél nincs csoportválasztó ablak. A szabály HUF- és EUR-tételekre egyaránt érvényes.
+For **purchases, only the amounts of items with a group contribute** to the daily purchase total. Purchases with an empty group or a group containing only spaces are excluded from this total, but their documents are recorded as processed. There is no group-selection window for purchases. The rule applies to both HUF and EUR items.
 
-## Importálás
+## Importing
 
-1. Zárd be Excelben az érintett éves riportokat, hogy a program menteni tudjon beléjük.
-2. Kattints az **Importálás** gombra, és tallózd be a CSV-fájlt.
-3. Várd meg a feldolgozást. Az importgomb addig nem használható. Több év esetén a program külön éves riportokkal dolgozik.
-4. Ha a program csoportválasztást vagy árfolyamot kér, töltsd ki a megjelenő ablakot az alábbiak szerint.
-5. Az évenkénti előnézetben ellenőrizd a célfájlt és a hozzáadandó összegeket.
-6. **Elfogadás** esetén a program elmenti az adott évet. **Elutasítás** esetén annak az évnek a változásait nem menti, és folytatja a következő évvel.
-7. A folyamat végén az importgomb ismét használható. A mentett riportot megnyithatod Excelben, ahol a képletek újraszámolódnak.
+1. Close the affected annual reports in Excel so that the program can save changes to them.
+2. Click **Import** and browse to the CSV file.
+3. Wait for processing to finish. The Import button cannot be used during this time. If multiple years are involved, the program works with separate annual reports.
+4. If the program requests a group selection or an exchange rate, complete the displayed window as described below.
+5. In each yearly preview, check the destination file and the amounts to be added.
+6. Choosing **Accept** saves that year. Choosing **Reject** leaves that year's changes unsaved and continues with the next year.
+7. At the end of the process, the Import button becomes usable again. You can open the saved report in Excel, where the formulas will be recalculated.
 
-A fájl neve `Napi_értékesítési_riport_ÉV.xlsx`, például `Napi_értékesítési_riport_2026.xlsx`. Új fájlban mind a tizenkét hónap, az **Összesítő**, az **Euro**, valamint a rejtett árfolyam- és bizonylatnyilvántartás szerepel.
+The filename is `Sales_Report_YEAR.xlsx`, for example `Sales_Report_2026.xlsx`. A new file contains all twelve months, **Összesítő**, **Euro**, and the hidden exchange-rate and document registers.
 
-### A havi riport használata
+### Using the monthly report
 
-A havi munkalapokon az **első három sor és az A–C oszlop rögzített**. Görgetéskor ezek láthatók maradnak; az első görgethető cella **D4**.
+On monthly worksheets, the **first three rows and columns A–C are frozen**. They remain visible while scrolling; the first scrollable cell is **D4**.
 
-A bemutató sablon egyes mezői semleges nevet vagy `-` feliratot kaptak. A kötőjel csak a feliratot helyettesíti: a mögöttes cellák és a megmaradt képletek továbbra is működnek.
+Some fields in the demonstration template have been given neutral names or a `-` label. The hyphen only replaces the label: the underlying cells and remaining formulas continue to work.
 
-### Hiányzó csoport
+### Missing group
 
-Üres csoportú, partner alapján nem kizárt számlatételnél az ablak kiírja a bizonylatszámot és a cikkszámot. Válassz a hat gomb közül:
+For an invoice item with an empty group that is not excluded based on its partner, the window displays the document number and item code. Choose one of the six buttons:
 
-- Új alkatrész
-- Bontott alkatrész
-- Munkadíj
-- Szállítási költség
+- New parts
+- Used parts
+- Labor
+- Shipping
 - Trailer
-- Egyik sem
+- None of these
 
-Az **Egyik sem** üresen hagyja a csoportot. Ettől a tétel csoportalapú összesítésbe nem kerül, de a külön cikkszám szerinti havi összesítés továbbra is érvényesülhet. A választás csak az adott import tételét módosítja, az eredeti CSV-t nem írja át. A választóablak **X** gombja megszakítja az importot.
+**None of these** leaves the group empty. As a result, the item is not included in group-based aggregation, but separate monthly aggregation by item code may still apply. The choice changes only the item in the current import; it does not rewrite the original CSV. The selection window's **X** button cancels the import.
 
-### Árfolyam megadása
+### Entering an exchange rate
 
-A program lekéri az aktuális MNB EUR/HUF árfolyamot, és felhasználja a riportokban már tárolt napi árfolyamokat. Hiányzó naphoz a legutóbbi, a célnapnál nem későbbi ismert forrásdátumú árfolyamot használja. Ha ilyen nincs, vagy az aktuális lekérés nem sikerül, kézi bevitelt kér.
+The program retrieves the current MNB EUR/HUF exchange rate and uses daily exchange rates already stored in the reports. For a missing day, it uses the rate with the latest known source date that is not later than the target day. If no such rate exists, or the current rate cannot be retrieved, manual input is requested.
 
-Adj meg pozitív árfolyamot, például `380,25`, és valódi forrásdátumot `ÉÉÉÉ-HH-NN` formátumban, például `2026-09-18`. Kézi bevitelkor a forrásdátum eltérhet a tétel napjától, akár későbbi is lehet. Hibás szám vagy dátum esetén a program új bevitelt kér.
+Enter a positive exchange rate, for example `380,25`, and a valid source date in `YYYY-MM-DD` format, for example `2026-09-18`. With manual input, the source date may differ from the item's date and may even be later. If the number or date is invalid, the program requests new input.
 
-Az **Euro** munkalap havi árfolyamait a kézzel kitöltött EUR-mezők képletei használják. Új munkafüzetben ezek nulla értékkel indulnak. Az import csak az aktuális év aktuális hónapjának havi árfolyamát frissíti; egy korábbi hónap kézi EUR-összegeinek használata előtt ellenőrizd és szükség szerint töltsd ki az adott hónap árfolyamát. A CSV EUR-tételeinek napi átváltása ettől külön működik.
+The monthly exchange rates on the **Euro** worksheet are used by the formulas for manually completed EUR fields. In a new workbook, these start at zero. Import updates only the monthly rate for the current month of the current year; before using manual EUR amounts for an earlier month, check and, if necessary, fill in that month's exchange rate. Daily conversion of EUR items from the CSV works separately from this.
 
-### Ismételt import és megszakítás
+### Repeated imports and cancellation
 
-A program **év és bizonylatszám alapján** tartja nyilván a már importált bizonylatokat. Ugyanazon teljes fájl ismételt importja nem növeli újra az összegeket. Az ismert és új bizonylatokat együtt tartalmazó fájlból csak az új bizonylatok tételei kerülnek be.
+The program records imported documents **by year and document number**. Importing the same complete file again does not increase the amounts again. From a file containing both known and new documents, only the items belonging to new documents are imported.
 
-Már importált bizonylathoz utólag hozzáadott vagy módosított CSV-sor nem frissíti a riportot: az adott bizonylat összes tétele kimarad. Az ilyen helyesbítést külön kell egyeztetni; a CSV újraimportálása nem korrekciós művelet.
+A CSV row added or modified after its document has already been imported does not update the report: all items belonging to that document are skipped. Such corrections must be agreed separately; reimporting the CSV is not a correction operation.
 
-A főablak bezárása megszakítást kér. A program megvárja a háttérfeldolgozás leállását. A még el nem mentett évek változásai nem maradnak meg, a korábban már elfogadott és sikeresen mentett évek viszont igen.
+Closing the main window requests cancellation. The program waits for background processing to stop. Changes for years that have not yet been saved are lost, while years already accepted and successfully saved are retained.
 
-## Főmenü
+## Main menu
 
-| Gomb | Működés |
+| Button | Behavior |
 | --- | --- |
-| Importálás | CSV kiválasztása, feldolgozása és évenkénti előnézet. |
-| Újalkatrész-csoport hozzáadása | További újalkatrész-csoportok megadása pontosvesszővel elválasztva. |
-| Újalkatrész-csoport eltávolítása | Korábban felvett további csoportok eltávolítása. |
-| Riportmappa módosítása | Másik létező célmappa kiválasztása. A korábbi riportokat nem helyezi át. |
-| Jelenlegi beállítások megtekintése | A riportmappa és a további újalkatrész-csoportok megjelenítése. |
-| Kilépés | Az alkalmazás bezárása. |
-| Alaphelyzetbe állítás és bezárás | Megerősítés után a beállítások törlése és az alkalmazás bezárása. |
+| Import | CSV selection, processing and a preview for each year. |
+| Add new-part groups | Enter additional new-part groups separated by semicolons. |
+| Remove new-part groups | Remove previously added additional groups. |
+| Change report folder | Select another existing destination folder. Previously created reports are not moved. |
+| View current settings | Display the report folder and additional new-part groups. |
+| Exit | Close the application. |
+| Reset and close | Delete the settings after confirmation and close the application. |
 
-A hozzáadás és eltávolítás ablakában legalább egy csoportot adj meg. Hibás bevitel esetén javítsd az adatokat, vagy válaszd a **Megszakítás** lehetőséget.
+Enter at least one group in the add or remove window. If the input is invalid, correct it or choose **Cancel**.
 
-**Az alaphelyzetbe állítás nem törli a riportmappát vagy az Excel-riportokat.** A mentett célmappa-beállítást és a csoportlistát törli. Következő indításkor a program újra bekéri őket. Ha ugyanazt a riportmappát választod, az ottani éves fájlok árfolyam- és bizonylatnyilvántartása megmarad.
+**Resetting does not delete the report folder or the Excel reports.** It deletes the saved destination-folder setting and group list. On the next launch, the program requests them again. If you select the same report folder, the exchange-rate and document registers in the annual files there are retained.
 
-## Hibák és figyelmeztetések
+## Errors and warnings
 
-Hiba esetén olvasd el az üzenetet, majd zárd be az **OK** gombbal. Hibás CSV-nél az üzenet a problémás mezőt, és sorhiba esetén a sorszámot is megjelöli. Javítsd a fájlt Rons Data Editben, vagy készíts új exportot, majd indítsd újra az importot.
+If an error occurs, read the message and close it using **OK**. For invalid CSV files, the message identifies the problematic field and, for row errors, the line number as well. Correct the file in Rons Data Edit, or create a new export, then restart the import.
 
-Ha a program nem tud menteni, ellenőrizd, hogy a riport nincs-e megnyitva Excelben, és a célmappa elérhető-e, illetve írható-e. Többéves importban egy későbbi mentési hiba előtt sikeresen mentett évek megmaradnak.
+If the program cannot save, check that the report is not open in Excel and that the destination folder is available and writable. In a multi-year import, years successfully saved before a later save error are retained.
 
-A munkafüzet szerkezeti vagy képlethibája megszakítja az importot. Az üzenet alapján állítsd helyre a megjelölt munkalapot vagy cellát. A havi lapok közül az importtal érintett hónapokat ellenőrzi a program.
+A workbook structure or formula error interrupts the import. Use the message to restore the indicated worksheet or cell. Of the monthly sheets, the program checks those affected by the import.
 
-Formázási vagy méreteltérés esetén az import folytatódhat. A program csak az első ilyen figyelmeztetést mutatja meg; a megjelölt helyen ellenőrizd a táblázatot. Az Excel egyszerű újramentéséből eredő, jelentésükben azonos képlet- és formázásváltozatokat elfogadja.
+Import may continue if a formatting or dimension difference is found. The program displays only the first such warning; check the spreadsheet at the indicated location. It accepts formula and formatting variations that have the same meaning and result from simply resaving the file in Excel.
 
-## A riportok megőrzése
+## Preserving the reports
 
-A riportokban a kézi adatbevitelre szánt mezők továbbra is kitölthetők Excelben. A munkalapneveket, dátumokat, fejléceket, összevonásokat, képleteket és rejtett nyilvántartásokat őrizd meg.
+Fields intended for manual data entry in the reports can still be filled in using Excel. Preserve worksheet names, dates, headers, merged ranges, formulas and hidden registers.
 
-A program ideiglenes fájlon keresztül ment, **automatikus biztonsági másolatot nem készít**. A riportok és a bennük tárolt bizonylatnyilvántartás megőrzéséről a felhasználó gondoskodik. A program nettó összegeket összesít és egész forintra kerekít; részletekben importálva a kerekítés miatt kis eltérés lehet az egyszeri teljes importhoz képest.
+The program saves through a temporary file and **does not create automatic backups**. The user is responsible for preserving the reports and the document register stored in them. The program aggregates net amounts and rounds to whole HUF; importing in batches may produce a small rounding difference compared with a single complete import.
 
-A beállításfájl Windows alatt: `%APPDATA%\axelpro_riport\settings.json`.
+The settings file on Windows is: `%APPDATA%\axelpro_riport\settings.json`.

@@ -1,7 +1,7 @@
 from calendar import monthrange
 from datetime import date, timedelta
 import pytest
-from axelpro_riport.calendar_utils import get_month_weeks
+from sales_report.calendar_utils import get_month_weeks
 
 
 @pytest.mark.parametrize("year", [2024, 2026, 2027])

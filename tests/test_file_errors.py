@@ -1,4 +1,4 @@
-"""Valódi fájlok és determinisztikusan előidézett I/O hibák."""
+"""Test file errors."""
 
 from pathlib import Path
 from xml.etree.ElementTree import ParseError
@@ -6,8 +6,8 @@ from zipfile import BadZipFile
 import pytest
 from openpyxl import Workbook
 from openpyxl.utils.exceptions import InvalidFileException
-from axelpro_riport import csv_reader as csv
-from axelpro_riport import excel_files as excel
+from sales_report import csv_reader as csv
+from sales_report import excel_files as excel
 
 
 def test_missing_csv_has_filename_and_cause(tmp_path):
@@ -51,7 +51,7 @@ def test_workbook_existence_error(tmp_path, monkeypatch):
         raise PermissionError("stat denied")
 
     monkeypatch.setattr(Path, "exists", deny)
-    with pytest.raises(excel.WorkbookFileAccessError, match="elérhetősége"):
+    with pytest.raises(excel.WorkbookFileAccessError, match="availability"):
         excel.load_year_workbook(tmp_path, 2026, {1}, None)
 
 
@@ -59,7 +59,7 @@ def test_workbook_existence_error(tmp_path, monkeypatch):
     "failure", [PermissionError("denied"), FileNotFoundError("vanished")]
 )
 def test_workbook_open_access_failure(tmp_path, monkeypatch, failure):
-    (tmp_path / "Napi_értékesítési_riport_2026.xlsx").touch()
+    (tmp_path / "Sales_Report_2026.xlsx").touch()
 
     def fail(*args, **kwargs):
         raise failure
@@ -75,7 +75,7 @@ def test_workbook_open_access_failure(tmp_path, monkeypatch, failure):
     [BadZipFile("bad zip"), ParseError("bad xml"), InvalidFileException("bad xlsx")],
 )
 def test_corrupt_workbook_is_not_access_error(tmp_path, monkeypatch, failure):
-    (tmp_path / "Napi_értékesítési_riport_2026.xlsx").touch()
+    (tmp_path / "Sales_Report_2026.xlsx").touch()
 
     def fail(*args, **kwargs):
         raise failure
@@ -87,7 +87,7 @@ def test_corrupt_workbook_is_not_access_error(tmp_path, monkeypatch, failure):
 
 
 def test_actual_non_zip_xlsx_rejected(tmp_path):
-    (tmp_path / "Napi_értékesítési_riport_2026.xlsx").write_text("not an xlsx")
+    (tmp_path / "Sales_Report_2026.xlsx").write_text("not an xlsx")
     with pytest.raises(excel.WorkbookValidationError):
         excel.load_year_workbook(tmp_path, 2026, {1}, None)
 
